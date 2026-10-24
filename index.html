@@ -448,7 +448,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     if ((st.details || []).includes("long") && !isCape) o.push(`<path d="M${CX - hem + 3},${bottom - 4} Q${CX},${bottom + 22} ${CX + hem - 3},${bottom - 4} Z" fill="${shade(color, -.28)}"/>`);
     // legs (slim jeans) and ankle boots
     const legL = [[CX - 27, 160], [CX - 26, 210], [CX - 18, 262], [CX - 17, 305], [CX - 13, 345], [CX - 5, 345], [CX - 4, 300], [CX - 3, 262], [CX - 1, 200]];
-    o.push(`<path d="M${CX - 26},136 L${CX + 26},136 Q${CX + 29},160 ${CX + 27},176 L${CX - 27},176 Q${CX - 29},160 ${CX - 26},136 Z" fill="${LEGS}"/>`);
+    o.push(`<path d="M${CX - 26},136 L${CX + 26},136 Q${CX + 29},160 ${CX + 27},176 Q${CX},228 ${CX - 27},176 Q${CX - 29},160 ${CX - 26},136 Z" fill="${LEGS}"/>`);
     o.push(`<path d="${smooth(legL)}" fill="${LEGS}"/><path d="${smooth(mirror(legL))}" fill="${LEGS}"/>`);
     o.push(`<path d="M${CX - 1},190 L${CX - 1},250" stroke="#000" stroke-opacity=".2" stroke-width="1"/>`);
     if (use.includes("active")) {

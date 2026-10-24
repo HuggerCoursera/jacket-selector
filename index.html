@@ -139,6 +139,20 @@ legend + * { clear: both; }
 .card small { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; }
 .card:hover { transform: translateY(-2px); }
 .card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); animation: pop .25s; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px 8px; }
+.tile {
+  font: inherit; font-weight: 700; font-size: 13px; line-height: 1.2; color: var(--ink); text-align: center; cursor: pointer;
+  background: none; border: 0; padding: 0; display: grid; gap: 6px; justify-items: stretch; align-content: start; min-width: 0;
+}
+.tile .pic {
+  display: grid; place-items: center; height: 96px; border-radius: 16px; overflow: hidden;
+  background: linear-gradient(160deg, var(--stage-a), var(--stage-b)); border: 2px solid transparent; transition: transform .15s, border-color .15s;
+}
+.tile .pic svg { height: 100%; width: 100%; display: block; }
+.tile:hover .pic { transform: translateY(-2px); }
+.tile[aria-pressed="true"] .pic { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.tile[aria-pressed="true"] { color: var(--accent); }
+.tile[aria-disabled="true"] { opacity: .35; text-decoration: line-through; }
 .colors { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 6px; }
 @media (min-width: 620px) { .colors { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
 .sw { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink);
@@ -278,7 +292,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     { id: "protect", title: "Защита от погоды", hint: "Можно несколько.", kind: "multi", options: [
       ["water", "Не промокает"], ["wind", "Не продувается"], ["any", "Не важно"],
     ]},
-    { id: "material", title: "Материал верха", hint: "Можно несколько.", kind: "multi", options: [
+    { id: "material", title: "Материал верха", hint: "Можно несколько. На рисунке будет первый.", kind: "multi", options: [
       ["nylon", "Нейлон, плащёвка"], ["cotton", "Хлопок, габардин"], ["wool", "Шерсть"], ["leather", "Кожа"], ["eco", "Экокожа"], ["suede", "Замша"], ["denim", "Деним"], ["furM", "Мех, эко-мех"],
     ]},
     { id: "colors", title: "Цвет", hint: "Отметь все, что нравятся. На рисунке будет первый.", kind: "colors", options: [
@@ -386,13 +400,13 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
   const FIT = { fitted: [32, 25, 31, .14], straight: [33, 31, 33, .07], over: [40, 39, 41, .08], belt: [33, 26, 32, .12] };
   const CX = 100;
 
-  function illustrate(st, uid) {
+  function illustrate(st, uid, scene) {
     const t = st.type || "";
     const p = PRESETS[t] || {};
     const fit = st.fit || p.fit || "straight";
     const bottom = LEN_Y[st.length || p.length] || 236;
     const isCape = t === "cape", isPuffer = t === "pufS" || t === "pufL";
-    const mats = st.material || [], details = st.details || [], insul = st.insul || [];
+    const mats = [(st.material && st.material[0]) || (p.material || [])[0]].filter(Boolean), details = st.details || [], insul = st.insul || [];
     const use = st.use || [], protect = st.protect || [], temp = st.temp || "";
     const color = st.colors && st.colors.length ? COLOR_HEX[st.colors[0]] : (p.color || "#EE3D6B");
     const light = lum(color) > .6;
@@ -404,7 +418,6 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     const hasFur = st.fur === "faux" || st.fur === "real";
     const hood = st.hood === "fixed" || st.hood === "detach";
     const collar = st.collar || "", closure = st.closure || "", texture = st.texture || "", finish = st.finish || "";
-    const scene = !uid.startsWith("t");
     const id = s => `${s}-${uid}`;
 
     // volume grows with insulation and the coldest temperature
@@ -437,6 +450,9 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       <linearGradient id="${id("sh")}" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".25" stop-color="#fff" stop-opacity=".18"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset=".72" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></linearGradient>
       <linearGradient id="${id("gl")}" x1="0" x2="1"><stop offset=".25" stop-color="#fff" stop-opacity="0"/><stop offset=".33" stop-color="#fff" stop-opacity=".45"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient>
       <filter id="${id("n")}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="${mats.includes("furM") || t === "fur" ? .45 : 1.2}" numOctaves="2" seed="7"/><feColorMatrix type="saturate" values="0"/></filter>
+      <pattern id="${id("tw")}" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="3" stroke="${mats.includes("denim") ? "#fff" : detailC}" stroke-width=".8" stroke-opacity="${mats.includes("denim") ? .28 : .16}"/></pattern>
+      <pattern id="${id("fu")}" width="6" height="5" patternUnits="userSpaceOnUse"><path d="M1,4.5 q1.5,-3.5 3,0 M3.5,2 q1.2,-2 2.4,0" stroke="${shade(color, light ? -.18 : .28)}" stroke-width=".8" fill="none" stroke-linecap="round"/></pattern>
+      <radialGradient id="${id("su")}"><stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
     </defs>`);
 
     // scene: season, rain, wind, suitcase
@@ -457,11 +473,11 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     // straight hair, back part (falls just past the shoulders)
     if (!hood) o.push(`<rect x="70" y="80" width="60" height="80" rx="12" fill="${HAIR}"/>`);
     // long back hem shows behind the legs
-    if (details.includes("long") && !isCape) o.push(`<path d="M${CX - hem + 4},${bottom - 4} Q${CX},${bottom + 22} ${CX + hem - 4},${bottom - 4} Z" fill="${shade(color, -.28)}"/>`);
     // jeans and shoes
     o.push(`<rect x="80" y="190" width="40" height="46" rx="12" fill="${LEGS}"/><rect x="85" y="214" width="14" height="140" rx="7" fill="${LEGS}"/><rect x="101" y="214" width="14" height="140" rx="7" fill="${LEGS}"/>`);
     if (use.includes("active")) o.push(`<rect x="79" y="352" width="22" height="14" rx="7" fill="#F7F7FA" stroke="#B7BCCB" stroke-width=".8"/><rect x="99" y="352" width="22" height="14" rx="7" fill="#F7F7FA" stroke="#B7BCCB" stroke-width=".8"/><path d="M80,363 L100,363 M100,363 L120,363" stroke="#EE3D6B" stroke-width="2.2"/>`);
     else o.push(`<rect x="83" y="330" width="18" height="36" rx="7" fill="${BOOT}"/><rect x="99" y="330" width="18" height="36" rx="7" fill="${BOOT}"/>`);
+    if (details.includes("long") && !isCape) o.push(`<path d="M${CX - hem + 4},${bottom - 4} Q${CX},${bottom + 30} ${CX + hem - 4},${bottom - 4} Z" fill="${shade(color, -.28)}"/>`);
     // neck and hands
     o.push(`<rect x="94" y="108" width="12" height="22" rx="5" fill="${SKIN}"/>`);
     if (!isCape) o.push(`<circle cx="${f1(handL[0])}" cy="${handL[1]}" r="6" fill="${SKIN}"/><circle cx="${f1(handR[0])}" cy="${handR[1]}" r="6" fill="${SKIN}"/>`);
@@ -482,7 +498,10 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     const furry = mats.includes("furM") || t === "fur";
     if (furry || mats.includes("wool") || mats.includes("suede") || mats.includes("denim")) ov.push(`<rect width="200" height="400" filter="url(#${id("n")})" opacity="${furry ? .3 : mats.includes("suede") ? .2 : .14}" style="mix-blend-mode:overlay"/>`);
     ov.push(`<rect width="200" height="400" fill="url(#${id("sh")})"/>`);
-    const sheen = finish === "gloss" ? 1 : (mats.includes("leather") || mats.includes("eco")) ? .7 : (isPuffer || mats.includes("nylon")) ? .4 : 0;
+    if (mats.includes("cotton") || mats.includes("denim")) ov.push(`<rect width="200" height="400" fill="url(#${id("tw")})"/>`);
+    if (furry) ov.push(`<rect width="200" height="400" fill="url(#${id("fu")})"/>`);
+    if (mats.includes("suede")) ov.push(`<ellipse cx="84" cy="176" rx="22" ry="34" fill="url(#${id("su")})"/><ellipse cx="118" cy="226" rx="18" ry="28" fill="url(#${id("su")})"/><ellipse cx="62" cy="190" rx="8" ry="22" fill="url(#${id("su")})"/>`);
+    const sheen = finish === "gloss" || mats.includes("eco") ? 1 : mats.includes("leather") ? .6 : (isPuffer || mats.includes("nylon")) ? .45 : 0;
     if (sheen) ov.push(`<rect width="200" height="400" fill="url(#${id("gl")})" opacity="${sheen}"/>`);
     if (!isCape && (mats.includes("leather") || mats.includes("eco") || mats.includes("suede"))) ov.push(`<path d="M${CX - 16},132 Q${CX - 14},180 ${CX - 16},${bottom} M${CX + 16},132 Q${CX + 14},180 ${CX + 16},${bottom}" stroke="${edge}" stroke-width=".9" fill="none"/>`);
     if (mats.includes("cotton")) ov.push(`<path d="M0,${bottom - 5} Q100,${bottom - 1} 200,${bottom - 5}" stroke="${detailC}" stroke-width=".7" stroke-dasharray="2 1.5" fill="none" opacity=".7"/>`);
@@ -512,8 +531,13 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     }
     // knit cuffs and hem band
     if (!isCape && (details.includes("cuffs") || t === "bomber")) {
-      [[SL, EL], [SR, ER]].forEach(([S, E]) => { const k = 9 / Math.hypot(E[0] - S[0], E[1] - S[1]);
-        o.push(`<path d="${capsule([E[0] - (E[0] - S[0]) * k, E[1] - (E[1] - S[1]) * k], E, sw - 2)}" fill="${rib}" stroke="${edge}" stroke-width=".9"/>`); });
+      [[SL, EL], [SR, ER]].forEach(([S, E]) => {
+        const len = Math.hypot(E[0] - S[0], E[1] - S[1]), ux = (E[0] - S[0]) / len, uy = (E[1] - S[1]) / len;
+        const r = sw / 2 - .6, nx = -uy * r, ny = ux * r, a = [E[0] - ux * 9, E[1] - uy * 9], e = [E[0] + ux * 2, E[1] + uy * 2];
+        const q = [[a[0] + nx, a[1] + ny], [e[0] + nx, e[1] + ny], [e[0] - nx, e[1] - ny], [a[0] - nx, a[1] - ny]].map(v => v.map(f1).join(",")).join(" L");
+        o.push(`<path d="M${q}Z" fill="${rib}" stroke="${edge}" stroke-width=".9" stroke-linejoin="round"/>`);
+        for (let i = -2; i <= 2; i++) o.push(`<line x1="${f1(a[0] + nx * i / 3)}" y1="${f1(a[1] + ny * i / 3)}" x2="${f1(e[0] + nx * i / 3)}" y2="${f1(e[1] + ny * i / 3)}" stroke="${edge}" stroke-width=".5" opacity=".6"/>`);
+      });
       if (t === "bomber") o.push(`<path d="M${CX - hem},${bottom - 9} Q${CX},${bottom - 5} ${CX + hem},${bottom - 9} L${CX + hem},${bottom} Q${CX},${bottom + 4} ${CX - hem},${bottom} Z" fill="${rib}" stroke="${edge}" stroke-width=".9"/>`);
     }
     // closure
@@ -544,7 +568,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     if (protect.includes("water")) [[CX - 18, 160], [CX + 16, 176], [CX - 10, 214], [CX + 22, 232], [CX - 26, 200], [CX + 8, 146]].forEach(([x, y]) => {
       if (y < bottom - 6) o.push(`<path d="M${x},${y} q-2.4,3.6 0,5.2 q2.4,-1.6 0,-5.2 Z" fill="#fff" opacity=".8"/>`);
     });
-    if (scene && use.includes("active") && !isCape) o.push(`<path d="M${CX - 19},126 Q${CX - 22},160 ${CX - 23},192 M${CX + 19},126 Q${CX + 22},160 ${CX + 23},192" stroke="#3A3F55" stroke-width="3.6" fill="none" stroke-linecap="round"/>`);
+    if (scene && use.includes("active") && !isCape) o.push(`<path d="M${CX - 19},126 Q${CX - 22},160 ${CX - 23},192 M${CX + 19},126 Q${CX + 22},160 ${CX + 23},192" stroke="#E85D7E" stroke-width="3.6" fill="none" stroke-linecap="round"/>`);
     if (scene && use.includes("city") && !isCape) { const bx = handR[0];
       o.push(`<path d="M${bx - 6},${handR[1] + 2} Q${bx},${handR[1] - 12} ${bx + 6},${handR[1] + 2}" stroke="#8E3E2A" stroke-width="1.8" fill="none"/><rect x="${bx - 11}" y="${handR[1] + 1}" width="22" height="17" rx="5" fill="#C0623F" stroke="#8E3E2A"/><rect x="${bx - 2}" y="${handR[1] + 5}" width="4" height="3" rx="1" fill="#E8C77A"/>`); }
     if (scene && use.includes("walk") && !isCape) { const [hx, hy] = handL;
@@ -586,7 +610,22 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
   // ---------- Form ----------
   const form = document.getElementById("form");
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const chipGroup = g => `<div class="chips" data-group="${g.id}">` + g.options.map(o =>
+  // Crops of the live drawing used as option pictures: field -> viewBox (or per-option map)
+  const FULL = "20 46 160 320", SCENE = "0 6 200 380";
+  const PICS = {
+    length: FULL, fit: FULL, insul: "34 96 132 176", temp: SCENE, hood: "50 46 100 100", fur: "50 46 100 100",
+    collar: "58 96 84 84", closure: "44 108 112 150", protect: SCENE, material: "56 138 88 88",
+    texture: "42 118 116 116", finish: "42 118 116 116", use: "36 120 148 252",
+    details: { cuffs: "28 196 66 66", pockets: "44 128 112 150", waistAdj: "50 160 100 70", twoZip: "60 196 80 80", long: "40 196 120 150", inner: "" },
+  };
+  const SCENE_FIELDS = new Set(["temp", "protect", "use"]);
+  const INNER_ICON = `<svg viewBox="0 0 60 60" aria-hidden="true"><path d="M14,8 L30,14 L30,56 L10,56 Z" fill="#E9B9C7"/><path d="M46,8 L30,14 L30,56 L50,56 Z" fill="#F5D3DD"/><rect x="34" y="26" width="12" height="14" rx="2" fill="none" stroke="#B0476B" stroke-width="1.5" stroke-dasharray="3 2"/></svg>`;
+  const tileGroup = g => `<div class="tiles" data-group="${g.id}">` + g.options.map(o => {
+    const vb = typeof PICS[g.id] === "string" ? PICS[g.id] : PICS[g.id][o[0]];
+    const pic = vb ? `<svg viewBox="${vb}" aria-hidden="true"></svg>` : INNER_ICON;
+    return `<button type="button" class="tile" id="opt-${g.id}-${o[0]}" data-v="${o[0]}" aria-pressed="false"><span class="pic">${pic}</span>${esc(o[1])}</button>`;
+  }).join("") + "</div>";
+  const chipGroup = g => PICS[g.id] ? tileGroup(g) : `<div class="chips" data-group="${g.id}">` + g.options.map(o =>
     `<button type="button" class="chip" id="opt-${g.id}-${o[0]}" data-v="${o[0]}" aria-pressed="false">${esc(o[1])}</button>`).join("") + "</div>";
   form.innerHTML = SECTIONS.map(s => {
     let inner;
@@ -612,7 +651,31 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     SECTIONS[0].options.forEach(([v]) => {
       const pr = PRESETS[v];
       const st = Object.assign({}, pr, { type: v, colors: key ? [key] : [] });
-      document.querySelector(`#opt-type-${v} svg`).innerHTML = illustrate(st, "t" + v);
+      document.querySelector(`#opt-type-${v} svg`).innerHTML = illustrate(st, "t" + v, false);
+    });
+  }
+
+  // Option pictures: her current jacket with that one option applied
+  const picCache = new Map();
+  function previewState(field, v) {
+    const st = JSON.parse(JSON.stringify(S));
+    st[field] = MULTI.has(field) ? [v] : v;
+    if (field === "collar") st.hood = "no";
+    if (field === "fur" && st.hood !== "fixed" && st.hood !== "detach" && (!st.collar || st.collar === "none")) st.collar = "stand";
+    if (field === "hood" && v !== "no") st.collar = st.collar || "stand";
+    st.must = st.nogo = st.brands = ""; st.touched = [];
+    return st;
+  }
+  function drawOptionPics() {
+    form.querySelectorAll(".tiles").forEach(g => {
+      const field = g.dataset.group;
+      g.querySelectorAll(".tile").forEach(b => {
+        const svg = b.querySelector("svg[viewBox]:not([viewBox='0 0 60 60'])"); if (!svg) return;
+        const st = previewState(field, b.dataset.v), key = JSON.stringify(st);
+        if (picCache.get(b.id) === key) return;
+        picCache.set(b.id, key);
+        svg.innerHTML = illustrate(st, "p" + field + b.dataset.v, SCENE_FIELDS.has(field));
+      });
     });
   }
 
@@ -763,7 +826,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
 
   const COUNTED = ["type", "length", "fit", "insul", "temp", "hood", "collar", "closure", "protect", "material", "colors", "details", "use", "size"];
   function updateStage() {
-    document.getElementById("art").innerHTML = illustrate(S, "main");
+    document.getElementById("art").innerHTML = illustrate(S, "main", true);
     document.getElementById("kind").textContent = S.type ? lbl("type", S.type) : "Выбери тип куртки";
     const tags = [S.length && lbl("length", S.length), S.fit && lbl("fit", S.fit), S.temp && lbl("temp", S.temp),
       S.hood && S.hood !== "no" && "Капюшон", (S.fur === "faux" || S.fur === "real") && "С мехом", S.size.length && "Размер " + S.size.join("/")].filter(Boolean);
@@ -774,7 +837,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     document.getElementById("meterBar").style.width = (100 * done / COUNTED.length) + "%";
   }
   function update(textOnly) {
-    if (!textOnly) { syncForm(); updateStage(); drawThumbs(); }
+    if (!textOnly) { syncForm(); updateStage(); drawThumbs(); drawOptionPics(); }
     document.getElementById("summary").textContent = summaryText(false);
     save();
   }

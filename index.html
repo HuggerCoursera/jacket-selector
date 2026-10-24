@@ -178,6 +178,15 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
 .btn.ghost { background: transparent; color: var(--accent); border-color: var(--accent); box-shadow: none; }
 .btn.quiet { background: transparent; color: var(--muted); border-color: var(--line); box-shadow: none; }
 .status { min-height: 1.5em; font-size: 14px; font-weight: 700; color: var(--accent); margin-top: 10px; }
+.chip[aria-disabled="true"], .sw[aria-disabled="true"] { opacity: .35; }
+.chip[aria-disabled="true"] { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.chip[aria-disabled="true"]:hover { border-color: transparent; }
+.toast {
+  position: fixed; z-index: 20; left: 0; right: 0; margin: 0 auto; width: min(520px, calc(100% - 32px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); border-radius: 16px; padding: 12px 16px;
+  font-weight: 700; font-size: 15px; line-height: 1.4; box-shadow: var(--shadow);
+}
 @media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; animation: none !important; } }
 </style>
 </head>
@@ -187,13 +196,13 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
   <header>
     <span class="eyebrow">Осень · Зима</span>
     <h1>Моя <em>идеальная</em> куртка</h1>
-    <p>Выбирай, что нравится: рисунок и описание меняются сразу. Если вопрос не важен, просто пропусти его. В конце нажми «Отправить».</p>
+    <p>Выбирай, что нравится: рисунок и описание меняются сразу. Если вопрос не важен, просто пропусти его. Зачёркнутые варианты не сочетаются с уже выбранным, нажми на них, чтобы узнать почему. В конце нажми «Отправить».</p>
   </header>
   <div class="banner" id="sharedBanner" hidden>Это выбор, которым поделились по ссылке. Его можно посмотреть и изменить.</div>
 
   <div class="layout">
     <aside class="stage" aria-live="polite">
-      <svg id="art" viewBox="0 0 200 400" role="img" aria-label="Рисунок выбранной куртки"></svg>
+      <svg id="art" viewBox="0 6 200 380" role="img" aria-label="Рисунок выбранной куртки"></svg>
       <div class="info">
         <p class="kind" id="kind">Куртка</p>
         <ul class="tags" id="tags"></ul>
@@ -217,6 +226,8 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     </div>
   </div>
 </div>
+
+<div class="toast" id="toast" role="status" hidden></div>
 
 <script>
 (() => {
@@ -341,7 +352,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
   const save = () => { try { localStorage.setItem("jacket-v1", JSON.stringify(S)); } catch (e) {} };
   document.getElementById("sharedBanner").hidden = !fromLink;
 
-  // ---------- Illustration ----------
+  // ---------- Illustration: a petite figure built from simple shapes ----------
   const shade = (hex, f) => {
     const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
     const t = f < 0 ? 0 : 255, p = Math.abs(f);
@@ -363,74 +374,74 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     return d + "Z";
   }
   const mirror = pts => pts.map(p => [200 - p[0], p[1], p[2]]);
+  // Rounded capsule between two points (sleeves, cuffs)
+  function capsule(S, E, w) {
+    const dx = E[0] - S[0], dy = E[1] - S[1], len = Math.hypot(dx, dy), r = w / 2;
+    const nx = -dy / len * r, ny = dx / len * r;
+    return `M${f1(S[0] + nx)},${f1(S[1] + ny)} L${f1(E[0] + nx)},${f1(E[1] + ny)} A${r},${r} 0 0 0 ${f1(E[0] - nx)},${f1(E[1] - ny)} L${f1(S[0] - nx)},${f1(S[1] - ny)} A${r},${r} 0 0 0 ${f1(S[0] + nx)},${f1(S[1] + ny)}Z`;
+  }
 
-  const SKIN = "#F6D9C6", SKIN_SH = "#E7B9A0", HAIR = "#C9A66B", HAIR_HI = "#E6CC97", HAIR_SH = "#9E7D4B";
-  const LEGS = "#2F3550", BOOT = "#3A2724";
-  const LEN_Y = { waist: 152, hip: 186, mid: 214, knee: 258, below: 300 };
-  const FIT = { fitted: [30, 26, 19, 28, .14], straight: [31, 28, 25, 30, .06], over: [37, 35, 34, 37, .07], belt: [31, 27, 20, 30, .12] };
+  const SKIN = "#F7DCCB", HAIR = "#C9A66B", HAIR_HI = "#E3C893", LEGS = "#34395A", BOOT = "#4A302B";
+  const LEN_Y = { waist: 206, hip: 236, mid: 262, knee: 296, below: 330 };
+  const FIT = { fitted: [32, 25, 31, .14], straight: [33, 31, 33, .07], over: [40, 39, 41, .08], belt: [33, 26, 32, .12] };
   const CX = 100;
 
   function illustrate(st, uid) {
     const t = st.type || "";
     const p = PRESETS[t] || {};
     const fit = st.fit || p.fit || "straight";
-    const bottom = LEN_Y[st.length || p.length] || 186;
+    const bottom = LEN_Y[st.length || p.length] || 236;
     const isCape = t === "cape", isPuffer = t === "pufS" || t === "pufL";
-    const mats = st.material || [];
-    const details = st.details || [];
+    const mats = st.material || [], details = st.details || [], insul = st.insul || [];
+    const use = st.use || [], protect = st.protect || [], temp = st.temp || "";
     const color = st.colors && st.colors.length ? COLOR_HEX[st.colors[0]] : (p.color || "#EE3D6B");
     const light = lum(color) > .6;
     const edge = shade(color, light ? -.3 : -.45);
     const detailC = light ? shade(color, -.55) : shade(color, .5);
+    const rib = shade(color, light ? -.22 : -.3);
     const hardware = "#D9B970";
     const furC = st.fur === "real" ? "#C8AE8C" : "#F3EEE6";
     const hasFur = st.fur === "faux" || st.fur === "real";
     const hood = st.hood === "fixed" || st.hood === "detach";
-    const collar = st.collar || "", closure = st.closure || "";
-    const texture = st.texture || "", finish = st.finish || "";
-    const id = s => `${s}-${uid}`;
+    const collar = st.collar || "", closure = st.closure || "", texture = st.texture || "", finish = st.finish || "";
     const scene = !uid.startsWith("t");
-    const use = st.use || [], protect = st.protect || [];
-    const H = str => `<g transform="translate(100 56) scale(1.12) translate(-100 -56)">${str}</g>`;
+    const id = s => `${s}-${uid}`;
 
-    const insul = st.insul || [];
-    const temp = st.temp || "";
+    // volume grows with insulation and the coldest temperature
     const pf = Math.max(insul.includes("down") ? 3 : 0, insul.includes("synth") ? 2 : 0, insul.includes("furIns") ? 2 : 0, insul.includes("wool") ? 1 : 0)
       + (isPuffer ? 2 : 0) + (temp === "m20" ? 1 : 0);
     const W = FIT[fit] || FIT.straight;
-    const sh = W[0] + pf, ch = W[1] + pf, wa = W[2] + pf, hi = W[3] + pf;
-    const hem = bottom > 186 ? hi + (bottom - 180) * W[4] : wa + (hi - wa) * (bottom - 140) / 38 - (t === "bomber" ? 2 : 0);
+    const sh = W[0] + pf, wa = W[1] + pf, hi = W[2] + pf;
+    const hem = bottom > 224 ? hi + (bottom - 224) * W[3] : wa + (hi - wa) * (bottom - 196) / 28 - (t === "bomber" ? 2 : 0);
 
-    // jacket outline
-    let bodyPts;
+    let body;
     if (isCape) {
-      const cw = Math.max(52, hem + 20);
-      const half = [[CX - 7, 57], [CX - 21, 64], [CX - 36, 92], [CX - cw, bottom, true]];
-      bodyPts = [...half, [CX, bottom + 4], ...mirror(half).reverse(), [CX, 61]];
+      const cw = Math.max(54, hem + 18);
+      const half = [[CX - 10, 123, true], [CX - 24, 128], [CX - 40, 160], [CX - cw, bottom, true]];
+      body = smooth([...half, [CX, bottom + 3], ...mirror(half).reverse(), [CX, 130]]);
     } else {
-      const half = [[CX - 7, 56, true], [CX - sh + 4, 62.5], [CX - sh - 1, 70], [CX - ch, 98], [CX - wa, 140]];
-      if (bottom > 186) half.push([CX - hi, 178]);
+      const half = [[CX - 10, 123, true], [CX - sh + 6, 125], [CX - sh, 136], [CX - wa, 196]];
+      if (bottom > 226) half.push([CX - hi, 224]);
       half.push([CX - hem, bottom, true]);
-      bodyPts = [...half, [CX, bottom + 3], ...mirror(half).reverse(), [CX, 61]];
+      body = smooth([...half, [CX, bottom + 3], ...mirror(half).reverse(), [CX, 131]]);
     }
-    const body = smooth(bodyPts);
-    const sw = (fit === "over" ? 17 : 13) + pf * 1.2;
-    const wristX = CX - sh - 10;
-    const sleevePts = [[CX - sh + 5, 63, true], [CX - sh - 2, 67], [CX - sh - 6, 82], [CX - sh - 8, 130], [wristX - sw / 2, 194, true], [wristX + sw / 2, 196, true], [wristX + sw / 2 + 2, 132], [CX - ch + 4, 100, true]];
-    const sleeveL = smooth(sleevePts), sleeveR = smooth(mirror(sleevePts));
-    const handX = wristX + 1;
+    const sw = (fit === "over" ? 20 : 16) + pf;
+    const SL = [CX - sh + 6, 134], EL = [CX - sh - 6, 228];
+    const SR = [200 - SL[0], SL[1]], ER = [200 - EL[0], EL[1]];
+    const sleeveL = capsule(SL, EL, sw), sleeveR = capsule(SR, ER, sw);
+    const handL = [EL[0] - 1, EL[1] + 8], handR = [ER[0] + 1, ER[1] + 8];
 
     const o = [];
     o.push(`<defs>
       <clipPath id="${id("c")}"><path d="${body}"/>${isCape ? "" : `<path d="${sleeveL}"/><path d="${sleeveR}"/>`}</clipPath>
-      <linearGradient id="${id("sh")}" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".0"/><stop offset=".22" stop-color="#fff" stop-opacity=".22"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset=".7" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient>
+      <linearGradient id="${id("sh")}" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".25" stop-color="#fff" stop-opacity=".18"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset=".72" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></linearGradient>
       <linearGradient id="${id("gl")}" x1="0" x2="1"><stop offset=".25" stop-color="#fff" stop-opacity="0"/><stop offset=".33" stop-color="#fff" stop-opacity=".45"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient>
-      <linearGradient id="${id("hr")}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${HAIR_HI}"/><stop offset=".5" stop-color="${HAIR}"/><stop offset="1" stop-color="${HAIR_SH}"/></linearGradient>
       <filter id="${id("n")}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="${mats.includes("furM") || t === "fur" ? .45 : 1.2}" numOctaves="2" seed="7"/><feColorMatrix type="saturate" values="0"/></filter>
     </defs>`);
 
+    // scene: season, rain, wind, suitcase
     if (scene) {
-      const P = [[18,40],[170,30],[34,120],[160,110],[12,210],[178,190],[40,300],[165,280],[26,350],[150,60],[60,20],[140,160],[186,250],[10,280],[176,345],[48,170]];
+      const P = [[18, 40], [170, 30], [34, 120], [160, 110], [12, 210], [178, 190], [40, 300], [165, 280], [26, 350], [150, 60], [60, 20], [140, 160], [186, 250], [10, 280], [176, 345], [48, 170]];
       if (temp === "p5") P.slice(0, 9).forEach(([x, y], i) => o.push(`<ellipse cx="${x}" cy="${y}" rx="5" ry="2.6" transform="rotate(${i * 47 % 180} ${x} ${y})" fill="${["#F08A3A", "#E2552E", "#F4B53F"][i % 3]}" opacity=".85"/>`));
       if (temp === "0" || protect.includes("water")) P.forEach(([x, y]) => o.push(`<line x1="${x}" y1="${y}" x2="${x - 3}" y2="${y + 10}" stroke="#6FA3DB" stroke-width="1.4" stroke-linecap="round" opacity=".55"/>`));
       if (temp === "m10" || temp === "m20") {
@@ -438,158 +449,137 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
         flakes.forEach(([x, y], i) => o.push(`<circle cx="${x}" cy="${y}" r="${1.4 + (i % 3) * .7}" fill="#fff" stroke="#B9C9E4" stroke-width=".5"/>`));
         if (temp === "m20") o.push(`<path d="M0,378 Q50,362 100,370 Q150,360 200,374 L200,400 L0,400 Z" fill="#fff" stroke="#D5E0F0"/>`);
       }
-      if (protect.includes("wind")) o.push(`<path d="M8,96 q20,-8 34,0 q8,5 0,9 M156,140 q18,-8 32,0 M150,150 q14,-6 26,0 M10,250 q22,-8 36,0 q8,6 -1,9" stroke="#8DA9D6" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8"/>`);
-      if (use.includes("trip")) o.push(`<rect x="146" y="298" width="34" height="66" rx="6" fill="#4F7FD1" stroke="#36599A"/><path d="M155,298 L155,280 L171,280 L171,298" fill="none" stroke="#36599A" stroke-width="2.4"/><line x1="146" x2="180" y1="318" y2="318" stroke="#36599A"/><line x1="146" x2="180" y1="344" y2="344" stroke="#36599A"/><circle cx="152" cy="367" r="3" fill="#2B2B33"/><circle cx="174" cy="367" r="3" fill="#2B2B33"/>`);
+      if (protect.includes("wind")) o.push(`<path d="M8,96 q20,-8 34,0 q8,5 0,9 M156,150 q18,-8 32,0 M150,160 q14,-6 26,0 M10,260 q22,-8 36,0 q8,6 -1,9" stroke="#8DA9D6" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8"/>`);
+      if (use.includes("trip")) o.push(`<rect x="148" y="300" width="32" height="64" rx="8" fill="#4F7FD1" stroke="#36599A"/><path d="M157,300 L157,284 L171,284 L171,300" fill="none" stroke="#36599A" stroke-width="2.4" stroke-linejoin="round"/><line x1="148" x2="180" y1="320" y2="320" stroke="#36599A"/><line x1="148" x2="180" y1="344" y2="344" stroke="#36599A"/><circle cx="154" cy="367" r="3" fill="#2B2B33"/><circle cx="174" cy="367" r="3" fill="#2B2B33"/>`);
     }
-    // ground shadow
-    o.push(`<ellipse cx="100" cy="374" rx="44" ry="6" fill="#000" opacity=".12"/>`);
-    // hair, back layer
-    if (!hood) o.push(H(`<path d="${smooth([[100, 17], [115, 21], [122, 36], [122, 58], [123, 88, true], [108, 88, true], [106, 64], [94, 64], [92, 88, true], [77, 88, true], [78, 58], [78, 36], [85, 21]])}" fill="url(#${id("hr")})"/>`));
-    if ((st.details || []).includes("long") && !isCape) o.push(`<path d="M${CX - hem + 3},${bottom - 4} Q${CX},${bottom + 22} ${CX + hem - 3},${bottom - 4} Z" fill="${shade(color, -.28)}"/>`);
-    // legs (slim jeans) and ankle boots
-    const legL = [[CX - 27, 160], [CX - 26, 210], [CX - 18, 262], [CX - 17, 305], [CX - 13, 345], [CX - 5, 345], [CX - 4, 300], [CX - 3, 262], [CX - 1, 200]];
-    o.push(`<path d="M${CX - 26},136 L${CX + 26},136 Q${CX + 29},160 ${CX + 27},176 Q${CX},228 ${CX - 27},176 Q${CX - 29},160 ${CX - 26},136 Z" fill="${LEGS}"/>`);
-    o.push(`<path d="${smooth(legL)}" fill="${LEGS}"/><path d="${smooth(mirror(legL))}" fill="${LEGS}"/>`);
-    o.push(`<path d="M${CX - 1},190 L${CX - 1},250" stroke="#000" stroke-opacity=".2" stroke-width="1"/>`);
-    if (use.includes("active")) {
-      const sn = [[CX - 15, 356], [CX - 4, 355], [CX - 3, 371, true], [CX - 23, 371, true], [CX - 22, 364]];
-      o.push(`<path d="${smooth(sn)}" fill="#F7F7FA" stroke="#B7BCCB" stroke-width=".8"/><path d="${smooth(mirror(sn))}" fill="#F7F7FA" stroke="#B7BCCB" stroke-width=".8"/><path d="M${CX - 23},369 L${CX - 3},369 M${CX + 3},369 L${CX + 23},369" stroke="#EE3D6B" stroke-width="2"/>`);
-    } else {
-      const boot = [[CX - 15, 334], [CX - 4, 334], [CX - 3, 362], [CX - 3, 371, true], [CX - 22, 371, true], [CX - 21, 365], [CX - 14, 359]];
-      o.push(`<path d="${smooth(boot)}" fill="${BOOT}"/><path d="${smooth(mirror(boot))}" fill="${BOOT}"/>`);
-      o.push(`<rect x="${CX - 7}" y="366" width="4" height="7" rx="1" fill="${BOOT}"/><rect x="${CX + 3}" y="366" width="4" height="7" rx="1" fill="${BOOT}"/>`);
-    }
+    o.push(`<ellipse cx="100" cy="370" rx="40" ry="5.5" fill="#000" opacity=".12"/>`);
+
+    // straight hair, back part (falls just past the shoulders)
+    if (!hood) o.push(`<rect x="70" y="80" width="60" height="80" rx="12" fill="${HAIR}"/>`);
+    // long back hem shows behind the legs
+    if (details.includes("long") && !isCape) o.push(`<path d="M${CX - hem + 4},${bottom - 4} Q${CX},${bottom + 22} ${CX + hem - 4},${bottom - 4} Z" fill="${shade(color, -.28)}"/>`);
+    // jeans and shoes
+    o.push(`<rect x="80" y="190" width="40" height="46" rx="12" fill="${LEGS}"/><rect x="85" y="214" width="14" height="140" rx="7" fill="${LEGS}"/><rect x="101" y="214" width="14" height="140" rx="7" fill="${LEGS}"/>`);
+    if (use.includes("active")) o.push(`<rect x="79" y="352" width="22" height="14" rx="7" fill="#F7F7FA" stroke="#B7BCCB" stroke-width=".8"/><rect x="99" y="352" width="22" height="14" rx="7" fill="#F7F7FA" stroke="#B7BCCB" stroke-width=".8"/><path d="M80,363 L100,363 M100,363 L120,363" stroke="#EE3D6B" stroke-width="2.2"/>`);
+    else o.push(`<rect x="83" y="330" width="18" height="36" rx="7" fill="${BOOT}"/><rect x="99" y="330" width="18" height="36" rx="7" fill="${BOOT}"/>`);
     // neck and hands
-    o.push(`<path d="M94,46 L106,46 L107,62 Q100,66 93,62 Z" fill="${SKIN}"/><path d="M94,52 Q100,57 106,52 L106,56 Q100,60 94,56 Z" fill="${SKIN_SH}" opacity=".5"/>`);
-    if (!isCape) o.push(`<ellipse cx="${handX}" cy="203" rx="4.3" ry="7" fill="${SKIN}"/><ellipse cx="${200 - handX}" cy="203" rx="4.3" ry="7" fill="${SKIN}"/>`);
+    o.push(`<rect x="94" y="108" width="12" height="22" rx="5" fill="${SKIN}"/>`);
+    if (!isCape) o.push(`<circle cx="${f1(handL[0])}" cy="${handL[1]}" r="6" fill="${SKIN}"/><circle cx="${f1(handR[0])}" cy="${handR[1]}" r="6" fill="${SKIN}"/>`);
 
     // jacket
-    o.push(`<g fill="${color}" stroke="${edge}" stroke-width="1" stroke-linejoin="round">${isCape ? "" : `<path d="${sleeveL}"/><path d="${sleeveR}"/>`}<path d="${body}"/></g>`);
+    o.push(`<g fill="${color}" stroke="${edge}" stroke-width="1.2" stroke-linejoin="round">${isCape ? "" : `<path d="${sleeveL}"/><path d="${sleeveR}"/>`}<path d="${body}"/></g>`);
 
     const ov = [];
     if (texture === "quilt") {
-      if (isPuffer) for (let y = 78; y < bottom + 4; y += 15) ov.push(`<path d="M0,${y - 6} Q100,${y - 1} 200,${y - 6}" stroke="#fff" stroke-opacity=".22" stroke-width="4" fill="none"/><path d="M0,${y} Q100,${y + 5} 200,${y}" stroke="${edge}" stroke-width="1.3" fill="none"/>`);
-      else for (let k = -400; k < 400; k += 11) ov.push(`<line x1="${k}" y1="0" x2="${k + 400}" y2="400" stroke="${edge}" stroke-width=".7"/><line x1="${k + 400}" y1="0" x2="${k}" y2="400" stroke="${edge}" stroke-width=".7"/>`);
+      if (isPuffer) for (let y = 142; y < bottom + 4; y += 16) ov.push(`<path d="M0,${y - 7} Q100,${y - 2} 200,${y - 7}" stroke="#fff" stroke-opacity=".22" stroke-width="4" fill="none"/><path d="M0,${y} Q100,${y + 5} 200,${y}" stroke="${edge}" stroke-width="1.3" fill="none"/>`);
+      else for (let k = -400; k < 400; k += 12) ov.push(`<line x1="${k}" y1="0" x2="${k + 400}" y2="400" stroke="${edge}" stroke-width=".7"/><line x1="${k + 400}" y1="0" x2="${k}" y2="400" stroke="${edge}" stroke-width=".7"/>`);
     }
     if (texture === "check") {
-      for (let x = 2; x < 200; x += 13) ov.push(`<rect x="${x}" y="0" width="5" height="400" fill="${detailC}" opacity=".2"/>`);
-      for (let y = 58; y < 400; y += 13) ov.push(`<rect x="0" y="${y}" width="200" height="5" fill="${detailC}" opacity=".2"/>`);
-      for (let x = 9; x < 200; x += 13) ov.push(`<line x1="${x}" x2="${x}" y1="0" y2="400" stroke="${shade(color, -.6)}" stroke-width=".6" opacity=".55"/>`);
+      for (let x = 2; x < 200; x += 14) ov.push(`<rect x="${x}" y="0" width="5" height="400" fill="${detailC}" opacity=".2"/>`);
+      for (let y = 120; y < 400; y += 14) ov.push(`<rect x="0" y="${y}" width="200" height="5" fill="${detailC}" opacity=".2"/>`);
+      for (let x = 9; x < 200; x += 14) ov.push(`<line x1="${x}" x2="${x}" y1="0" y2="400" stroke="${shade(color, -.6)}" stroke-width=".6" opacity=".55"/>`);
     }
     const furry = mats.includes("furM") || t === "fur";
     if (furry || mats.includes("wool") || mats.includes("suede") || mats.includes("denim")) ov.push(`<rect width="200" height="400" filter="url(#${id("n")})" opacity="${furry ? .3 : mats.includes("suede") ? .2 : .14}" style="mix-blend-mode:overlay"/>`);
     ov.push(`<rect width="200" height="400" fill="url(#${id("sh")})"/>`);
     const sheen = finish === "gloss" ? 1 : (mats.includes("leather") || mats.includes("eco")) ? .7 : (isPuffer || mats.includes("nylon")) ? .4 : 0;
     if (sheen) ov.push(`<rect width="200" height="400" fill="url(#${id("gl")})" opacity="${sheen}"/>`);
-    if (!isCape && (mats.includes("leather") || mats.includes("eco") || mats.includes("suede"))) ov.push(`<path d="M${CX - 15},${66} Q${CX - 13},110 ${CX - 15},${bottom} M${CX + 15},66 Q${CX + 13},110 ${CX + 15},${bottom}" stroke="${edge}" stroke-width=".9" fill="none"/>`);
+    if (!isCape && (mats.includes("leather") || mats.includes("eco") || mats.includes("suede"))) ov.push(`<path d="M${CX - 16},132 Q${CX - 14},180 ${CX - 16},${bottom} M${CX + 16},132 Q${CX + 14},180 ${CX + 16},${bottom}" stroke="${edge}" stroke-width=".9" fill="none"/>`);
     if (mats.includes("cotton")) ov.push(`<path d="M0,${bottom - 5} Q100,${bottom - 1} 200,${bottom - 5}" stroke="${detailC}" stroke-width=".7" stroke-dasharray="2 1.5" fill="none" opacity=".7"/>`);
-    if (!isCape) [1, -1].forEach(s => {   // elbow folds and armhole seam
-      const m = x => s > 0 ? x : 200 - x;
-      ov.push(`<path d="M${m(CX - sh - 6)},128 q4,3 9,1 M${m(CX - sh - 6)},136 q4,2 8,0" stroke="${edge}" stroke-width=".8" fill="none" opacity=".8"/><path d="M${m(CX - sh + 4)},63 Q${m(CX - sh + 6)},84 ${m(CX - ch + 4)},100" stroke="${edge}" stroke-width=".8" fill="none" opacity=".7"/>`);
-    });
-    if (mats.includes("denim") || t === "denim") ov.push(`<path d="M${CX - ch},88 Q${CX},96 ${CX + ch},88" fill="none" stroke="#E8BE6E" stroke-width=".9" stroke-dasharray="2 1.6"/>`);
+    if (mats.includes("denim") || t === "denim") ov.push(`<path d="M${CX - sh},150 Q${CX},158 ${CX + sh},150" fill="none" stroke="#E8BE6E" stroke-width=".9" stroke-dasharray="2 1.6"/>`);
     o.push(`<g clip-path="url(#${id("c")})">${ov.join("")}</g>`);
     if (furry) o.push(`<path d="${body}" fill="none" stroke="${shade(color, .3)}" stroke-width="3.2" stroke-dasharray="1.2 1.8" stroke-linecap="round"/>`);
 
     // pockets
     const manyPk = details.includes("pockets") || t === "parka";
-    if (!isCape && bottom > 176) {
-      const py = Math.min(bottom - 16, 168);
-      [1, -1].forEach(s => {
-        const m = x => s > 0 ? x : 200 - x;
-        if (manyPk || t === "denim" || t === "shacket") o.push(`<rect x="${Math.min(m(CX - 22), m(CX - 8))}" y="${py}" width="14" height="${Math.min(17, bottom - py - 4)}" rx="2" fill="${color}" stroke="${edge}" stroke-width=".9"/><path d="M${m(CX - 23)},${py} L${m(CX - 7)},${py} L${m(CX - 8)},${py + 6} L${m(CX - 22)},${py + 6} Z" fill="${shade(color, -.08)}" stroke="${edge}" stroke-width=".9"/>`);
-        else o.push(`<line x1="${m(CX - 22)}" y1="${py + 10}" x2="${m(CX - 14)}" y2="${py - 2}" stroke="${edge}" stroke-width="1.5" stroke-linecap="round"/>`);
+    const patch = manyPk || t === "denim" || t === "shacket";
+    if (!isCape && bottom > 228) {
+      const py = Math.min(bottom - 20, 232);
+      [1, -1].forEach(s => { const m = x => s > 0 ? x : 200 - x;
+        if (patch) o.push(`<rect x="${Math.min(m(CX - 25), m(CX - 9))}" y="${py}" width="16" height="16" rx="4" fill="${color}" stroke="${edge}" stroke-width=".9"/><rect x="${Math.min(m(CX - 26), m(CX - 8))}" y="${py - 1}" width="18" height="6" rx="3" fill="${shade(color, -.08)}" stroke="${edge}" stroke-width=".9"/>`);
+        else o.push(`<line x1="${m(CX - 24)}" y1="${py + 10}" x2="${m(CX - 15)}" y2="${py - 2}" stroke="${edge}" stroke-width="1.6" stroke-linecap="round"/>`);
       });
     }
-    if (!isCape && (manyPk || t === "denim" || t === "shacket")) [1, -1].forEach(s => {
-      const m = x => s > 0 ? x : 200 - x;
-      o.push(`<path d="M${m(CX - 19)},96 L${m(CX - 8)},96 L${m(CX - 8)},103 L${m(CX - 13.5)},106 L${m(CX - 19)},103 Z" fill="${shade(color, -.08)}" stroke="${edge}" stroke-width=".9"/>`);
-    });
+    if (!isCape && patch) [1, -1].forEach(s => { const m = x => s > 0 ? x : 200 - x;
+      o.push(`<rect x="${Math.min(m(CX - 21), m(CX - 9))}" y="150" width="12" height="10" rx="3" fill="${shade(color, -.08)}" stroke="${edge}" stroke-width=".9"/>`); });
 
-    // belt / drawstring
-    const beltY = 136;
+    // belt or drawstring at the waist
+    const beltY = 190;
     if (fit === "belt" || t === "trench") {
-      o.push(`<path d="M${CX - wa - 1},${beltY} Q${CX},${beltY + 2} ${CX + wa + 1},${beltY} L${CX + wa + 1},${beltY + 7} Q${CX},${beltY + 9} ${CX - wa - 1},${beltY + 7} Z" fill="${shade(color, -.12)}" stroke="${edge}" stroke-width=".9"/><rect x="${CX - 5}" y="${beltY - 1}" width="10" height="10" rx="2" fill="none" stroke="${hardware}" stroke-width="1.6"/><path d="M${CX + 3},${beltY + 9} q-3,14 -6,26 M${CX + 6},${beltY + 9} q2,12 5,22" stroke="${shade(color, -.12)}" stroke-width="4" stroke-linecap="round" fill="none"/>`);
+      o.push(`<rect x="${CX - wa - 1}" y="${beltY}" width="${2 * wa + 2}" height="8" rx="4" fill="${shade(color, -.12)}" stroke="${edge}" stroke-width=".9"/><rect x="${CX - 6}" y="${beltY - 1.5}" width="12" height="11" rx="3" fill="none" stroke="${hardware}" stroke-width="1.8"/><path d="M${CX + 3},${beltY + 10} q-3,14 -6,24 M${CX + 7},${beltY + 10} q2,12 5,20" stroke="${shade(color, -.12)}" stroke-width="4.5" stroke-linecap="round" fill="none"/>`);
     } else if (details.includes("waistAdj")) {
-      o.push(`<path d="M${CX - wa},${beltY + 2} Q${CX},${beltY + 4} ${CX + wa},${beltY + 2}" stroke="${edge}" stroke-width="1" stroke-dasharray="2 2" fill="none"/><path d="M${CX - 3},${beltY + 3} l-2,10 M${CX + 3},${beltY + 3} l2,10" stroke="${detailC}" stroke-width="1" stroke-linecap="round"/>`);
+      o.push(`<path d="M${CX - wa},${beltY + 2} Q${CX},${beltY + 4} ${CX + wa},${beltY + 2}" stroke="${edge}" stroke-width="1" stroke-dasharray="2 2" fill="none"/><path d="M${CX - 3},${beltY + 3} l-2,10 M${CX + 3},${beltY + 3} l2,10" stroke="${detailC}" stroke-width="1.2" stroke-linecap="round"/><circle cx="${CX - 5}" cy="${beltY + 14}" r="1.6" fill="${detailC}"/><circle cx="${CX + 5}" cy="${beltY + 14}" r="1.6" fill="${detailC}"/>`);
     }
-    // ribbed cuffs and hem
+    // knit cuffs and hem band
     if (!isCape && (details.includes("cuffs") || t === "bomber")) {
-      const rib = shade(color, light ? -.25 : -.3);
-      [1, -1].forEach(s => {
-        const m = x => s > 0 ? x : 200 - x;
-        o.push(`<path d="M${m(wristX - sw / 2 + .5)},187 L${m(wristX + sw / 2 - .2)},189 L${m(wristX + sw / 2)},196 L${m(wristX - sw / 2)},194 Z" fill="${rib}" stroke="${edge}" stroke-width=".9"/>`);
-      });
-      if (t === "bomber") o.push(`<path d="M${CX - hem},${bottom - 8} Q${CX},${bottom - 4} ${CX + hem},${bottom - 8} L${CX + hem},${bottom} Q${CX},${bottom + 4} ${CX - hem},${bottom} Z" fill="${rib}" stroke="${edge}" stroke-width=".9"/>`);
+      [[SL, EL], [SR, ER]].forEach(([S, E]) => { const k = 9 / Math.hypot(E[0] - S[0], E[1] - S[1]);
+        o.push(`<path d="${capsule([E[0] - (E[0] - S[0]) * k, E[1] - (E[1] - S[1]) * k], E, sw - 2)}" fill="${rib}" stroke="${edge}" stroke-width=".9"/>`); });
+      if (t === "bomber") o.push(`<path d="M${CX - hem},${bottom - 9} Q${CX},${bottom - 5} ${CX + hem},${bottom - 9} L${CX + hem},${bottom} Q${CX},${bottom + 4} ${CX - hem},${bottom} Z" fill="${rib}" stroke="${edge}" stroke-width=".9"/>`);
     }
     // closure
-    const startY = collar === "eng" ? 112 : collar === "turn" ? 92 : 64;
+    const startY = collar === "eng" ? 176 : collar === "turn" ? 150 : 130;
     const endY = bottom - 3;
     if (closure === "zip") {
-      if (t === "leather") o.push(`<path d="M${CX - 9},60 L${CX + 12},106 L${CX + 12},${endY}" fill="none" stroke="${hardware}" stroke-width="1.3"/><rect x="${CX + 9.5}" y="108" width="5" height="9" rx="1.2" fill="${hardware}"/>`);
+      if (t === "leather") o.push(`<path d="M${CX - 10},128 L${CX + 12},170 L${CX + 12},${endY}" fill="none" stroke="${hardware}" stroke-width="1.4"/><rect x="${CX + 9.5}" y="172" width="5" height="10" rx="1.5" fill="${hardware}"/>`);
       else {
-        o.push(`<line x1="${CX}" x2="${CX}" y1="61" y2="${endY}" stroke="${detailC}" stroke-width="1.3"/><rect x="${CX - 2.2}" y="74" width="4.4" height="9" rx="1.2" fill="${hardware}"/>`);
-        if (details.includes("twoZip")) o.push(`<rect x="${CX - 2.2}" y="${endY - 12}" width="4.4" height="9" rx="1.2" fill="${hardware}"/>`);
+        o.push(`<line x1="${CX}" x2="${CX}" y1="126" y2="${endY}" stroke="${detailC}" stroke-width="1.4"/><rect x="${CX - 2.5}" y="138" width="5" height="10" rx="1.5" fill="${hardware}"/>`);
+        if (details.includes("twoZip")) o.push(`<rect x="${CX - 2.5}" y="${endY - 13}" width="5" height="10" rx="1.5" fill="${hardware}"/>`);
       }
     } else if (closure === "snap" || closure === "btn") {
       o.push(`<line x1="${CX}" x2="${CX}" y1="${startY - 6}" y2="${endY}" stroke="${edge}" stroke-width=".9"/>`);
       const step = closure === "snap" ? 17 : 22;
-      for (let y = startY; y < endY - 8; y += step) o.push(`<circle cx="${CX + 4}" cy="${y}" r="${closure === "snap" ? 1.7 : 2.7}" fill="${closure === "snap" ? hardware : detailC}"/>`);
+      for (let y = startY; y < endY - 8; y += step) o.push(`<circle cx="${CX + 4}" cy="${y}" r="${closure === "snap" ? 1.8 : 3}" fill="${closure === "snap" ? hardware : detailC}"/>`);
     } else if (closure === "dbl") {
       o.push(`<line x1="${CX + 12}" x2="${CX + 12}" y1="${startY - 6}" y2="${endY}" stroke="${edge}" stroke-width=".9"/>`);
-      for (let y = startY; y < Math.min(endY - 8, startY + 66); y += 22) o.push(`<circle cx="${CX - 7}" cy="${y}" r="2.7" fill="${detailC}"/><circle cx="${CX + 7}" cy="${y}" r="2.7" fill="${detailC}"/>`);
+      for (let y = startY; y < Math.min(endY - 8, startY + 66); y += 22) o.push(`<circle cx="${CX - 7}" cy="${y}" r="3" fill="${detailC}"/><circle cx="${CX + 7}" cy="${y}" r="3" fill="${detailC}"/>`);
     } else if (closure === "wrap") {
-      o.push(`<path d="M${CX - 6},64 Q${CX + 6},120 ${CX + hem - 6},${endY}" fill="none" stroke="${edge}" stroke-width="1.2"/>`);
+      o.push(`<path d="M${CX - 8},128 Q${CX + 6},180 ${CX + hem - 6},${endY}" fill="none" stroke="${edge}" stroke-width="1.3"/>`);
     }
+    // sheepskin trim, rain drops, accessories
     if (insul.includes("furIns") && !furry) {
-      const sh2 = "#F1E4CC";
-      o.push(`<path d="M${CX - hem + 1},${bottom - 1} Q${CX},${bottom + 3} ${CX + hem - 1},${bottom - 1}" stroke="${sh2}" stroke-width="4" stroke-dasharray="1.4 1" stroke-linecap="round" fill="none"/>`);
-      if (!isCape) [1, -1].forEach(s => { const m = x => s > 0 ? x : 200 - x;
-        o.push(`<line x1="${m(wristX - sw / 2 + 1)}" y1="193" x2="${m(wristX + sw / 2 - 1)}" y2="195" stroke="${sh2}" stroke-width="4" stroke-dasharray="1.4 1" stroke-linecap="round"/>`); });
+      const sk = "#F1E4CC";
+      o.push(`<path d="M${CX - hem + 1},${bottom - 1} Q${CX},${bottom + 3} ${CX + hem - 1},${bottom - 1}" stroke="${sk}" stroke-width="4.5" stroke-dasharray="1.4 1" stroke-linecap="round" fill="none"/>`);
+      if (!isCape) [EL, ER].forEach(E => o.push(`<line x1="${E[0] - sw / 2 + 1}" y1="${E[1] + 2}" x2="${E[0] + sw / 2 - 1}" y2="${E[1] + 2}" stroke="${sk}" stroke-width="5" stroke-dasharray="1.4 1" stroke-linecap="round"/>`));
     }
-    if (protect.includes("water")) [[CX - 18, 110], [CX + 16, 128], [CX - 10, 168], [CX + 22, 186], [CX - 30, 150], [CX + 8, 90]].forEach(([x, y]) => {
-      if (y < bottom - 6) o.push(`<path d="M${x},${y} q-2.2,3.4 0,4.8 q2.2,-1.4 0,-4.8 Z" fill="#fff" opacity=".75"/>`);
+    if (protect.includes("water")) [[CX - 18, 160], [CX + 16, 176], [CX - 10, 214], [CX + 22, 232], [CX - 26, 200], [CX + 8, 146]].forEach(([x, y]) => {
+      if (y < bottom - 6) o.push(`<path d="M${x},${y} q-2.4,3.6 0,5.2 q2.4,-1.6 0,-5.2 Z" fill="#fff" opacity=".8"/>`);
     });
-    if (scene && use.includes("active") && !isCape) o.push(`<path d="M${CX - 17},60 Q${CX - 20},100 ${CX - 22},132 M${CX + 17},60 Q${CX + 20},100 ${CX + 22},132" stroke="#3A3F55" stroke-width="3.2" fill="none" stroke-linecap="round"/>`);
-    if (scene && use.includes("city") && !isCape) { const bx = 200 - handX;
-      o.push(`<path d="M${bx - 5},204 Q${bx},190 ${bx + 5},204" stroke="#8E3E2A" stroke-width="1.6" fill="none"/><rect x="${bx - 9}" y="203" width="20" height="15" rx="4" fill="#C0623F" stroke="#8E3E2A"/><rect x="${bx - 1}" y="207" width="4" height="3" rx="1" fill="#E8C77A"/>`); }
-    if (scene && use.includes("walk") && !isCape) o.push(`<path d="M${handX - 4},195 L${handX + 4},195 L${handX + 3},208 L${handX - 3},208 Z" fill="#FFFFFF" stroke="#B9A08A" stroke-width=".7"/><rect x="${handX - 3.7}" y="199" width="7.4" height="4" fill="#9A6A48"/><rect x="${handX - 4.6}" y="193" width="9.2" height="2.4" rx="1" fill="#E9E2DA"/>`);
+    if (scene && use.includes("active") && !isCape) o.push(`<path d="M${CX - 19},126 Q${CX - 22},160 ${CX - 23},192 M${CX + 19},126 Q${CX + 22},160 ${CX + 23},192" stroke="#3A3F55" stroke-width="3.6" fill="none" stroke-linecap="round"/>`);
+    if (scene && use.includes("city") && !isCape) { const bx = handR[0];
+      o.push(`<path d="M${bx - 6},${handR[1] + 2} Q${bx},${handR[1] - 12} ${bx + 6},${handR[1] + 2}" stroke="#8E3E2A" stroke-width="1.8" fill="none"/><rect x="${bx - 11}" y="${handR[1] + 1}" width="22" height="17" rx="5" fill="#C0623F" stroke="#8E3E2A"/><rect x="${bx - 2}" y="${handR[1] + 5}" width="4" height="3" rx="1" fill="#E8C77A"/>`); }
+    if (scene && use.includes("walk") && !isCape) { const [hx, hy] = handL;
+      o.push(`<path d="M${hx - 5},${hy - 9} L${hx + 5},${hy - 9} L${hx + 4},${hy + 7} L${hx - 4},${hy + 7} Z" fill="#fff" stroke="#B9A08A" stroke-width=".7"/><rect x="${hx - 4.6}" y="${hy - 4}" width="9.2" height="5" fill="#9A6A48"/><rect x="${hx - 5.6}" y="${hy - 12}" width="11.2" height="3" rx="1.2" fill="#E9E2DA"/>`); }
+
     // collar
     const lap = shade(color, light ? -.07 : .1);
     const furCollar = hasFur && !hood;
     if (collar === "stand" && !hood) {
-      o.push(`<path d="M${CX - 11},50 Q${CX},48 ${CX + 11},50 L${CX + 12},63 Q${CX},68 ${CX - 12},63 Z" fill="${furCollar ? furC : color}" stroke="${edge}" stroke-width="1"/>`);
+      o.push(`<rect x="${CX - 13}" y="110" width="26" height="22" rx="7" fill="${furCollar ? furC : color}" stroke="${edge}" stroke-width="1.1"/>`);
     } else if (collar === "turn") {
       [1, -1].forEach(s => { const m = x => s > 0 ? x : 200 - x;
-        o.push(`<path d="${smooth([[m(CX - 8), 54, true], [m(CX - 20), 66, true], [m(CX - 13), 80], [m(CX - 2), 92, true], [m(CX), 68, true]])}" fill="${furCollar ? furC : lap}" stroke="${edge}" stroke-width="1" stroke-linejoin="round"/>`); });
+        o.push(`<path d="${smooth([[m(CX - 9), 120, true], [m(CX - 23), 130, true], [m(CX - 14), 142], [m(CX - 2), 152, true], [m(CX), 130, true]])}" fill="${furCollar ? furC : lap}" stroke="${edge}" stroke-width="1.1"/>`); });
     } else if (collar === "eng") {
       [1, -1].forEach(s => { const m = x => s > 0 ? x : 200 - x;
-        o.push(`<path d="M${m(CX - 8)},54 L${m(CX - 21)},63 L${m(CX - 16)},72 L${m(CX - 24)},77 Q${m(CX - 14)},96 ${m(CX - 2)},112 L${m(CX)},72 Z" fill="${furCollar ? furC : lap}" stroke="${edge}" stroke-width="1" stroke-linejoin="round"/>`); });
+        o.push(`<path d="${smooth([[m(CX - 9), 120, true], [m(CX - 24), 128, true], [m(CX - 18), 137, true], [m(CX - 27), 142, true], [m(CX - 2), 176, true], [m(CX), 136, true]])}" fill="${furCollar ? furC : lap}" stroke="${edge}" stroke-width="1.1"/>`); });
     } else if (!hood) {
-      o.push(`<path d="M${CX - 8},56 Q${CX},64 ${CX + 8},56" fill="none" stroke="${edge}" stroke-width="1.1"/>`);
+      o.push(`<path d="M${CX - 10},124 Q${CX},134 ${CX + 10},124" fill="none" stroke="${edge}" stroke-width="1.2"/>`);
     }
-    if (furCollar && collar && collar !== "none") o.push(`<path d="M${CX - 21},66 Q${CX},44 ${CX + 21},66" fill="none" stroke="${furC}" stroke-width="7" stroke-dasharray="1.6 1.2" stroke-linecap="round"/>`);
+    if (furCollar && collar && collar !== "none") o.push(`<path d="M${CX - 26},136 Q${CX},106 ${CX + 26},136" fill="none" stroke="${furC}" stroke-width="8" stroke-dasharray="1.7 1.3" stroke-linecap="round"/>`);
 
-    const head = [];
-    { const o = head;
+    // hood behind the head
     if (hood) {
-      o.push(`<path d="${smooth([[100, 12], [117, 17], [124, 36], [123, 55], [118, 66], [100, 70], [82, 66], [77, 55], [76, 36], [83, 17]])}" fill="${color}" stroke="${edge}" stroke-width="1"/>`);
-      if (texture === "quilt") o.push(`<path d="M78,30 Q100,24 122,30 M77,46 Q100,41 123,46" fill="none" stroke="${edge}" stroke-width="1"/>`);
-      o.push(`<ellipse cx="100" cy="39" rx="15" ry="18" fill="${shade(color, -.2)}"/>`);
-      if (st.hood === "detach") o.push(`<path d="M84,64 Q100,71 116,64" fill="none" stroke="${detailC}" stroke-width="1" stroke-dasharray="2 1.5"/>`);
+      o.push(`<circle cx="100" cy="90" r="37" fill="${color}" stroke="${edge}" stroke-width="1.2"/>`);
+      if (texture === "quilt") o.push(`<path d="M66,76 Q100,66 134,76 M64,96 Q100,88 136,96" fill="none" stroke="${edge}" stroke-width="1.1"/>`);
+      o.push(`<circle cx="100" cy="92" r="30" fill="${shade(color, -.2)}"/>`);
+      if (st.hood === "detach") o.push(`<path d="M76,121 Q100,132 124,121" fill="none" stroke="${detailC}" stroke-width="1.2" stroke-dasharray="2.5 2"/>`);
     }
-    // face: a faceless fashion-sketch head, only soft shading
-    o.push(`<path d="${smooth([[88.5, 35], [89.5, 46], [100, 53.5], [110.5, 46], [111.5, 35], [108, 25], [100, 22.5], [92, 25]])}" fill="${SKIN}"/>`);
-    o.push(`<path d="M104,52 Q110.5,47 111.3,36 Q112,46 106,51.5 Z" fill="${SKIN_SH}" opacity=".45"/>`);
-    // hair, front: straight blunt fringe and straight locks falling past the shoulders
-    o.push(`<path d="${smooth([[87.5, 39], [87, 26], [93, 19], [100, 17.5], [107, 19], [113, 26], [112.5, 39], [111, 33, true], [89, 33, true]])}" fill="url(#${id("hr")})"/>`);
-    const lockL = [[88.2, 30], [86, 48], [86, 66], [85.5, 86, true], [91, 84, true], [91, 64], [90.6, 46]];
-    o.push(`<path d="${smooth(lockL)}" fill="url(#${id("hr")})"/><path d="${smooth(mirror(lockL))}" fill="url(#${id("hr")})"/>`);
-    o.push(`<path d="M93,20 L92,32 M98,18.5 L97.5,32.5 M104,18.8 L104.5,32.5 M88.5,46 L88,82 M111.5,46 L112,82" stroke="${HAIR_HI}" stroke-width=".7" fill="none" stroke-linecap="round" opacity=".8"/>`);
-    // fur trim around the hood opening
-    if (hood && hasFur) o.push(`<ellipse cx="100" cy="40" rx="17.5" ry="20.5" fill="none" stroke="${furC}" stroke-width="7" stroke-dasharray="1.7 1.2" stroke-linecap="round"/>`);
-    }
-    o.push(H(head.join("")));
+    // head: a plain circle with rosy cheeks, straight fringe and side strands
+    o.push(`<circle cx="100" cy="92" r="26" fill="${SKIN}"/>`);
+    o.push(`<ellipse cx="88" cy="102" rx="4.5" ry="3" fill="#F4A3A8" opacity=".55"/><ellipse cx="112" cy="102" rx="4.5" ry="3" fill="#F4A3A8" opacity=".55"/>`);
+    const strandBottom = hood ? 116 : 154;
+    o.push(`<path d="M71,${strandBottom} L71,90 A29,29 0 0 1 129,90 L129,${strandBottom} Q125,${strandBottom + 3} 121,${strandBottom} L120,84 L80,84 L79,${strandBottom} Q75,${strandBottom + 3} 71,${strandBottom} Z" fill="${HAIR}"/>`);
+    o.push(`<path d="M86,68 Q100,62 114,68" stroke="${HAIR_HI}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M75,96 L75,${strandBottom - 6} M125,96 L125,${strandBottom - 6}" stroke="${HAIR_HI}" stroke-width="1.4" fill="none" stroke-linecap="round" opacity=".8"/>`);
+    if (hood && hasFur) o.push(`<circle cx="100" cy="92" r="31" fill="none" stroke="${furC}" stroke-width="8" stroke-dasharray="1.8 1.3" stroke-linecap="round"/>`);
     return o.join("");
   }
 
@@ -604,7 +594,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     else if (s.kind === "colors") inner = `<div class="colors" data-group="colors">` + s.options.map(o =>
       `<button type="button" class="sw" id="opt-colors-${o[0]}" data-v="${o[0]}" aria-pressed="false"><span style="background:${o[2]}"></span>${esc(o[1])}</button>`).join("") + "</div>";
     else if (s.cards) inner = `<div class="cards" data-group="${s.id}">` + s.options.map(o =>
-      `<button type="button" class="card" id="opt-${s.id}-${o[0]}" data-v="${o[0]}" aria-pressed="false"><svg viewBox="40 8 120 300" aria-hidden="true"></svg><span><b>${esc(o[1])}</b><small>${esc(o[2])}</small></span></button>`).join("") + "</div>";
+      `<button type="button" class="card" id="opt-${s.id}-${o[0]}" data-v="${o[0]}" aria-pressed="false"><svg viewBox="20 46 160 320" aria-hidden="true"></svg><span><b>${esc(o[1])}</b><small>${esc(o[2])}</small></span></button>`).join("") + "</div>";
     else inner = chipGroup(s);
     if (s.sub) {
       inner += `<div class="sub"><p class="sub-title">${esc(s.sub.title)}</p>${chipGroup(s.sub)}</div>`;
@@ -626,6 +616,65 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     });
   }
 
+  // ---------- Compatibility rules ----------
+  // Options a jacket type rules out: field -> values
+  const NOT_WOOL_LEATHER_FUR = ["wool", "leather", "suede", "denim", "furM"];
+  const TYPE_RULES = {
+    pufS:    { length: ["knee", "below"], insul: ["wool", "furIns", "none"], material: NOT_WOOL_LEATHER_FUR },
+    pufL:    { length: ["waist", "hip"], insul: ["wool", "furIns", "none"], material: NOT_WOOL_LEATHER_FUR },
+    parka:   { length: ["waist"], hood: ["no"] },
+    coat:    { length: ["waist", "hip", "mid"], insul: ["down", "furIns"], material: ["nylon", "denim", "furM"], texture: ["quilt"] },
+    hcoat:   { length: ["waist", "knee", "below"], insul: ["down", "furIns"], material: ["nylon", "denim", "furM"], texture: ["quilt"] },
+    trench:  { length: ["waist", "hip"], insul: ["down", "wool", "furIns"], temp: ["m10", "m20"], material: ["wool", "suede", "denim", "furM"], texture: ["quilt"], fur: ["faux", "real"] },
+    quilt:   { insul: ["wool", "furIns", "none"], temp: ["m20"], material: ["wool", "leather", "suede", "denim", "furM"], texture: ["plain", "check"] },
+    leather: { length: ["knee", "below"], insul: ["down"], temp: ["m20"], hood: ["fixed"], material: ["nylon", "cotton", "wool", "denim", "furM"], texture: ["check"] },
+    bomber:  { length: ["mid", "knee", "below"], fit: ["belt"], collar: ["eng"], closure: ["btn", "dbl", "wrap"], material: ["furM"] },
+    sheep:   { insul: ["down", "synth", "wool", "none"], material: ["nylon", "cotton", "wool", "denim", "furM"], texture: ["quilt", "check"] },
+    fur:     { insul: ["down", "synth", "wool", "none"], material: ["nylon", "cotton", "wool", "leather", "eco", "suede", "denim"], texture: ["quilt", "check"], finish: ["gloss"] },
+    wind:    { insul: ["down", "wool", "furIns"], temp: ["m10", "m20"], fur: ["faux", "real"], collar: ["eng"], material: ["wool", "leather", "suede", "denim", "furM"], texture: ["check"] },
+    denim:   { length: ["knee", "below"], insul: ["down"], temp: ["m10", "m20"], material: ["nylon", "wool", "leather", "eco", "suede", "furM"], texture: ["quilt"], finish: ["gloss"] },
+    shacket: { length: ["knee", "below"], insul: ["down", "furIns"], temp: ["m10", "m20"], collar: ["eng"], material: ["nylon", "leather", "eco", "suede", "furM"], texture: ["quilt"] },
+    cape:    { fit: ["fitted", "belt"], details: ["cuffs", "waistAdj"] },
+  };
+  const NO_CHECK = ["leather", "eco", "furM"];
+  const NO_GLOSS = ["wool", "suede", "denim", "furM", "cotton"];
+  const SIZE_ORDER = ["XS", "S", "M", "L", "XL"];
+
+  // Map "field:value" -> why that option can't be picked right now
+  function blockedMap(st) {
+    const m = new Map(), add = (f, v, why) => { if (!m.has(f + ":" + v)) m.set(f + ":" + v, why); };
+    const tr = TYPE_RULES[st.type];
+    if (tr) Object.keys(tr).forEach(f => tr[f].forEach(v => add(f, v, `Не бывает у типа «${lbl("type", st.type)}».`)));
+    if (st.insul.includes("none")) ["m10", "m20"].forEach(v => add("temp", v, "Без утеплителя в мороз не будет тепло. Сначала убери «Без утеплителя»."));
+    if (st.temp === "m10" || st.temp === "m20") add("insul", "none", `Для «${lbl("temp", st.temp)}» нужен утеплитель. Сначала поменяй температуру.`);
+    if (st.texture === "check") NO_CHECK.forEach(v => add("material", v, "Клетки не бывает на коже и мехе. Сначала убери узор «Клетка»."));
+    if (st.material.some(v => NO_CHECK.includes(v))) add("texture", "check", "Клетки не бывает на коже и мехе. Сначала убери этот материал.");
+    if (st.finish === "gloss") NO_GLOSS.forEach(v => add("material", v, "Этот материал не бывает блестящим. Сначала выбери «Матовая»."));
+    if (st.material.some(v => NO_GLOSS.includes(v))) add("finish", "gloss", "Шерсть, замша, хлопок, деним и мех не бывают блестящими.");
+    if (st.hood === "no" && st.collar === "none") ["faux", "real"].forEach(v => add("fur", v, "Без капюшона и воротника мех некуда пришить. Сначала выбери капюшон или воротник."));
+    if ((st.fur === "faux" || st.fur === "real") && st.hood === "no") add("collar", "none", "Мех нужен на воротнике, раз капюшона нет. Сначала убери мех.");
+    if ((st.fur === "faux" || st.fur === "real") && st.collar === "none") add("hood", "no", "Мех нужен на капюшоне, раз воротника нет. Сначала убери мех.");
+    if (st.closure && st.closure !== "zip") add("details", "twoZip", "Двусторонняя молния бывает только при застёжке на молнию.");
+    if (st.details.includes("twoZip")) ["snap", "btn", "dbl", "wrap"].forEach(v => add("closure", v, "Выбрана двусторонняя молния. Сначала убери её в «Деталях»."));
+    return m;
+  }
+  // Remove picked options that a newly chosen type rules out; returns their labels
+  function sanitize() {
+    const removed = [];
+    for (let guard = 0; guard < 40; guard++) {
+      const m = blockedMap(S);
+      const hit = [...m.keys()].map(k => k.split(":")).find(([f, v]) => Array.isArray(S[f]) ? S[f].includes(v) : S[f] === v);
+      if (!hit) break;
+      const [f, v] = hit;
+      if (Array.isArray(S[f])) S[f].splice(S[f].indexOf(v), 1); else S[f] = "";
+      removed.push(lbl(f, v));
+    }
+    return removed;
+  }
+
+  const toast = document.getElementById("toast");
+  const showToast = msg => { toast.textContent = msg; toast.hidden = false; clearTimeout(showToast.t); showToast.t = setTimeout(() => { toast.hidden = true; }, 4200); };
+
   function applyPreset(t) {
     const p = PRESETS[t]; if (!p) return;
     PRESET_KEYS.forEach(k => { if (!S.touched.includes(k)) S[k] = Array.isArray(p[k]) ? p[k].slice() : p[k]; });
@@ -633,18 +682,29 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
   form.addEventListener("click", e => {
     const btn = e.target.closest("button[data-v]"); if (!btn) return;
     const field = btn.parentElement.dataset.group, v = btn.dataset.v;
+    const picked = Array.isArray(S[field]) ? S[field].includes(v) : S[field] === v;
+    const why = blockedMap(S).get(field + ":" + v);
+    if (why && !picked) { showToast(why); return; }
     if (MULTI.has(field)) {
-      const arr = S[field], i = arr.indexOf(v);
-      if (i >= 0) arr.splice(i, 1);
-      else {
+      const arr = S[field];
+      if (picked) arr.splice(arr.indexOf(v), 1);
+      else if (field === "size") {
+        // at most two neighbouring sizes
+        const keep = arr.filter(x => Math.abs(SIZE_ORDER.indexOf(x) - SIZE_ORDER.indexOf(v)) === 1).slice(-1);
+        S.size = [...keep, v].sort((a, b) => SIZE_ORDER.indexOf(a) - SIZE_ORDER.indexOf(b));
+      } else {
         // "no insulation" and "doesn't matter" exclude the other answers
         if ((field === "insul" && v === "none") || (field === "protect" && v === "any")) arr.length = 0;
         else if (field === "insul" || field === "protect") { const j = arr.indexOf(field === "insul" ? "none" : "any"); if (j >= 0) arr.splice(j, 1); }
         arr.push(v);
       }
     } else {
-      S[field] = S[field] === v ? "" : v;
-      if (field === "type" && S.type) applyPreset(S.type);
+      S[field] = picked ? "" : v;
+      if (field === "type" && S.type) {
+        applyPreset(S.type);
+        const removed = sanitize();
+        if (removed.length) showToast(`Не сочетается с типом «${lbl("type", S.type)}», убрано: ${removed.join(", ").replace(/^./, c => c.toLowerCase())}.`);
+      }
     }
     if (field !== "type" && !S.touched.includes(field)) S.touched.push(field);
     update();
@@ -652,32 +712,38 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
   form.addEventListener("input", e => { const k = e.target.dataset.text; if (k) { S[k] = e.target.value; update(true); } });
 
   function syncForm() {
+    const blocked = blockedMap(S);
     form.querySelectorAll("[data-group]").forEach(g => {
       const val = S[g.dataset.group];
-      g.querySelectorAll("button[data-v]").forEach(b => b.setAttribute("aria-pressed", (Array.isArray(val) ? val.includes(b.dataset.v) : val === b.dataset.v) ? "true" : "false"));
+      g.querySelectorAll("button[data-v]").forEach(b => {
+        const on = Array.isArray(val) ? val.includes(b.dataset.v) : val === b.dataset.v;
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+        const why = !on && blocked.get(g.dataset.group + ":" + b.dataset.v);
+        if (why) { b.setAttribute("aria-disabled", "true"); b.title = why; } else { b.removeAttribute("aria-disabled"); b.removeAttribute("title"); }
+      });
     });
     form.querySelectorAll("[data-text]").forEach(t => { if (document.activeElement !== t) t.value = S[t.dataset.text] || ""; });
   }
 
   // ---------- Summary ----------
   const lbl = (f, v) => (LABEL[f] && LABEL[f][v]) || v;
-  const list = (f, arr) => arr.map(v => lbl(f, v).toLowerCase()).join(", ");
+  const list = (f, arr) => arr.map(v => lbl(f, v).replace(/^./, c => c.toLowerCase())).join(", ");
   function summaryLines() {
     const lines = [], add = (n, v) => { if (v) lines.push(`• ${n}: ${v}`); };
     add("Тип", S.type && lbl("type", S.type));
-    add("Длина", S.length && lbl("length", S.length).toLowerCase());
-    add("Силуэт", S.fit && lbl("fit", S.fit).toLowerCase());
+    add("Длина", S.length && lbl("length", S.length).replace(/^./, c => c.toLowerCase()));
+    add("Силуэт", S.fit && lbl("fit", S.fit).replace(/^./, c => c.toLowerCase()));
     add("Утеплитель", list("insul", S.insul));
-    add("Тепло", S.temp && lbl("temp", S.temp).toLowerCase());
-    add("Капюшон", S.hood && lbl("hood", S.hood).toLowerCase());
-    add("Мех", S.fur && (S.fur === "no" ? "без меха" : lbl("fur", S.fur).toLowerCase()));
-    add("Воротник", S.collar && lbl("collar", S.collar).toLowerCase());
-    add("Застёжка", S.closure && lbl("closure", S.closure).toLowerCase());
+    add("Тепло", S.temp && lbl("temp", S.temp).replace(/^./, c => c.toLowerCase()));
+    add("Капюшон", S.hood && lbl("hood", S.hood).replace(/^./, c => c.toLowerCase()));
+    add("Мех", S.fur && (S.fur === "no" ? "без меха" : lbl("fur", S.fur).replace(/^./, c => c.toLowerCase())));
+    add("Воротник", S.collar && lbl("collar", S.collar).replace(/^./, c => c.toLowerCase()));
+    add("Застёжка", S.closure && lbl("closure", S.closure).replace(/^./, c => c.toLowerCase()));
     add("Защита", list("protect", S.protect));
     add("Материал", list("material", S.material));
     add("Цвета", list("colors", S.colors));
-    add("Узор", S.texture && lbl("texture", S.texture).toLowerCase());
-    add("Поверхность", S.finish && lbl("finish", S.finish).toLowerCase());
+    add("Узор", S.texture && lbl("texture", S.texture).replace(/^./, c => c.toLowerCase()));
+    add("Поверхность", S.finish && lbl("finish", S.finish).replace(/^./, c => c.toLowerCase()));
     add("Детали", list("details", S.details));
     add("Для чего", list("use", S.use));
     add("Размер", S.size.join(" или "));
@@ -740,6 +806,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     }
   });
 
+  sanitize();
   update();
 })();
 </script>

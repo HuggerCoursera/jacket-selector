@@ -73,8 +73,8 @@ header p { margin: 0; color: var(--muted); max-width: 56ch; font-size: 16px; }
 
 /* Stage */
 .stage {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
-  border-radius: 0 0 var(--r) var(--r); margin-inline: -6px;
+  position: relative; z-index: 5;
+  border-radius: var(--r);
   background:
     radial-gradient(circle at 18% 30%, var(--stage-a) 0 42%, transparent 62%),
     radial-gradient(circle at 85% 80%, var(--stage-b) 0 35%, transparent 60%),
@@ -94,7 +94,7 @@ header p { margin: 0; color: var(--muted); max-width: 56ch; font-size: 16px; }
 .meter .bar { height: 6px; background: var(--surface); border-radius: 6px; margin-top: 4px; overflow: hidden; }
 .meter .bar i { display: block; height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .4s; }
 @media (min-width: 880px) {
-  .stage { top: 22px; border-radius: var(--r); margin: 0; grid-template-columns: 1fr; justify-items: center; padding: 18px 20px 22px; }
+  .stage { position: sticky; top: 22px; border-radius: var(--r); margin: 0; grid-template-columns: 1fr; justify-items: center; padding: 18px 20px 22px; }
   .stage svg { width: 230px; height: 460px; }
   .stage .info { width: 100%; }
   .stage .kind { font-size: 24px; text-align: center; }
@@ -149,6 +149,7 @@ legend + * { clear: both; }
   background: linear-gradient(160deg, var(--stage-a), var(--stage-b)); border: 2px solid transparent; transition: transform .15s, border-color .15s;
 }
 .tile .pic svg { height: 100%; width: 100%; display: block; }
+.tile .pic svg.icon { width: 64%; height: 64%; }
 .tile:hover .pic { transform: translateY(-2px); }
 .tile[aria-pressed="true"] .pic { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .tile[aria-pressed="true"] { color: var(--accent); }
@@ -195,6 +196,29 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
 .chip[aria-disabled="true"], .sw[aria-disabled="true"] { opacity: .35; }
 .chip[aria-disabled="true"] { text-decoration: line-through; text-decoration-thickness: 1.5px; }
 .chip[aria-disabled="true"]:hover { border-color: transparent; }
+.chip[data-auto] { background: var(--accent-soft); color: var(--ink); border: 2px dashed var(--accent); }
+.tile[data-auto] .pic { border-style: dashed; box-shadow: none; }
+.tile[data-auto] { color: var(--ink); }
+.card[data-auto] { border-style: dashed; }
+.done {
+  font: inherit; font-weight: 800; font-size: 14px; color: var(--accent-ink); cursor: pointer; border: 0;
+  border-radius: 999px; padding: 8px 16px; min-height: 40px; margin-top: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.mini {
+  position: fixed; z-index: 15; top: 0; left: 0; right: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: linear-gradient(90deg, var(--stage-a), var(--stage-b)); box-shadow: var(--shadow);
+  border-radius: 0 0 18px 18px;
+}
+.mini-in { display: flex; align-items: center; gap: 10px; max-width: 1100px; margin: 0 auto; padding-block: 4px; }
+.mini svg { width: 46px; height: 94px; flex: none; }
+.mini-info { min-width: 0; flex: 1; }
+.mini-kind { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 16px; line-height: 1.2; }
+.mini-meter { margin: 2px 0 0; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.mini .done { margin-top: 0; flex: none; }
+fieldset, .result { scroll-margin-top: 112px; }
 .toast {
   position: fixed; z-index: 20; left: 0; right: 0; margin: 0 auto; width: min(520px, calc(100% - 32px));
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
@@ -210,7 +234,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
   <header>
     <span class="eyebrow">Осень · Зима</span>
     <h1>Моя <em>идеальная</em> куртка</h1>
-    <p>Выбирай, что нравится: рисунок и описание меняются сразу. Если вопрос не важен, просто пропусти его. Зачёркнутые варианты не сочетаются с уже выбранным, нажми на них, чтобы узнать почему. В конце нажми «Отправить».</p>
+    <p>Выбирай, что нравится, рисунок меняется сразу. Любой вопрос можно пропустить.</p>
   </header>
   <div class="banner" id="sharedBanner" hidden>Это выбор, которым поделились по ссылке. Его можно посмотреть и изменить.</div>
 
@@ -222,6 +246,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
         <ul class="tags" id="tags"></ul>
         <div class="dots" id="dots"></div>
         <div class="meter"><span id="meterText"></span><div class="bar"><i id="meterBar"></i></div></div>
+        <button class="done" type="button" data-done>Готово</button>
       </div>
     </aside>
 
@@ -242,6 +267,13 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
 </div>
 
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="mini" id="mini" hidden>
+  <div class="mini-in">
+    <svg id="miniArt" viewBox="20 34 160 338" aria-hidden="true"></svg>
+    <div class="mini-info"><p class="mini-kind" id="miniKind"></p><p class="mini-meter" id="miniMeter"></p></div>
+    <button class="done" type="button" data-done>Готово</button>
+  </div>
+</div>
 
 <script>
 (() => {
@@ -249,7 +281,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
 
   // ---------- Questionnaire definition ----------
   const SECTIONS = [
-    { id: "type", title: "Какая куртка", hint: "Выбери один тип. Остальные вопросы заполнятся типичными вариантами, их можно поменять.", kind: "single", cards: true, options: [
+    { id: "type", title: "Какая куртка", hint: "Выбери один тип. Остальные вопросы заполнятся типичными вариантами (пунктирная рамка), их можно поменять. Сплошная рамка значит твой выбор.", kind: "single", cards: true, options: [
       ["pufS", "Пуховик короткий", "дутый, до бедра, очень тёплый"],
       ["pufL", "Пуховик длинный", "пуховое пальто до колена и ниже"],
       ["parka", "Парка", "удлинённая, с капюшоном, часто с мехом"],
@@ -260,7 +292,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       ["leather", "Косуха", "кожаная, короткая, с косой молнией"],
       ["bomber", "Бомбер", "с трикотажными манжетами и низом"],
       ["sheep", "Дублёнка", "из овчины, мехом внутрь"],
-      ["fur", "Шуба, эко-мех", "в том числе плюшевая «тедди»"],
+      ["fur", "Шуба, экомех", "в том числе плюшевая «тедди»"],
       ["wind", "Ветровка, анорак", "лёгкая, от ветра и дождя"],
       ["denim", "Джинсовая куртка", "деним, бывает утеплённая"],
       ["shacket", "Куртка-рубашка", "шакет, плотная, часто в клетку"],
@@ -275,7 +307,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     { id: "insul", title: "Утеплитель", hint: "Можно несколько.", kind: "multi", options: [
       ["down", "Натуральный пух"], ["synth", "Синтетика"], ["wool", "Шерсть"], ["furIns", "Мех, овчина"], ["none", "Без утеплителя"],
     ]},
-    { id: "temp", title: "До какой температуры тепло", kind: "single", options: [
+    { id: "temp", title: "Насколько тёплая", kind: "single", options: [
       ["p5", "До +5 °C"], ["0", "До 0 °C"], ["m10", "До −10 °C"], ["m20", "До −20 °C"],
     ]},
     { id: "hood", title: "Капюшон и мех", kind: "single", options: [
@@ -293,7 +325,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       ["water", "Не промокает"], ["wind", "Не продувается"], ["any", "Не важно"],
     ]},
     { id: "material", title: "Материал верха", hint: "Можно несколько. На рисунке будет первый.", kind: "multi", options: [
-      ["nylon", "Нейлон, плащёвка"], ["cotton", "Хлопок, габардин"], ["wool", "Шерсть"], ["leather", "Кожа"], ["eco", "Экокожа"], ["suede", "Замша"], ["denim", "Деним"], ["furM", "Мех, эко-мех"],
+      ["nylon", "Нейлон, плащёвка"], ["cotton", "Хлопок, габардин"], ["wool", "Шерсть"], ["leather", "Кожа"], ["eco", "Экокожа"], ["suede", "Замша"], ["denim", "Деним"], ["furM", "Мех, экомех"],
     ]},
     { id: "colors", title: "Цвет", hint: "Отметь все, что нравятся. На рисунке будет первый.", kind: "colors", options: [
       ["black", "Чёрный", "#1F1F24"], ["graph", "Графит", "#4A4F59"], ["grey", "Серый", "#A2A5AD"], ["milk", "Молочный", "#F0EBE1"],
@@ -301,7 +333,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       ["green", "Изумрудный", "#1F6B57"], ["navy", "Тёмно-синий", "#263759"], ["blue", "Голубой", "#93BCE0"], ["burg", "Бордовый", "#7A2338"],
       ["red", "Красный", "#D03A3A"], ["pink", "Пудровый", "#E8AFB5"], ["lav", "Лавандовый", "#B3A4DA"], ["must", "Горчичный", "#D9A332"],
     ], sub: { id: "texture", title: "Узор", options: [
-      ["plain", "Однотонная"], ["quilt", "Стёжка"], ["check", "Клетка"],
+      ["plain", "Однотонный"], ["quilt", "Стёганый"], ["check", "В клетку"],
     ], sub2: { id: "finish", title: "Поверхность", options: [
       ["matte", "Матовая"], ["gloss", "Блестящая"],
     ]}}},
@@ -398,9 +430,10 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
   const SKIN = "#F7DCCB", HAIR = "#C9A66B", HAIR_HI = "#E3C893", LEGS = "#34395A", BOOT = "#4A302B";
   const LEN_Y = { waist: 206, hip: 236, mid: 262, knee: 296, below: 330 };
   const FIT = { fitted: [32, 25, 31, .14], straight: [33, 31, 33, .07], over: [40, 39, 41, .08], belt: [33, 26, 32, .12] };
+  const FIT_PIC = { fitted: [31, 19, 30, .2], straight: [33, 33, 34, .03], over: [46, 46, 48, .1], belt: [33, 20, 32, .16] };
   const CX = 100;
 
-  function illustrate(st, uid, scene) {
+  function illustrate(st, uid, scene, pic) {
     const t = st.type || "";
     const p = PRESETS[t] || {};
     const fit = st.fit || p.fit || "straight";
@@ -423,8 +456,10 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     // volume grows with insulation and the coldest temperature
     const pf = Math.max(insul.includes("down") ? 3 : 0, insul.includes("synth") ? 2 : 0, insul.includes("furIns") ? 2 : 0, insul.includes("wool") ? 1 : 0)
       + (isPuffer ? 2 : 0) + (temp === "m20" ? 1 : 0);
-    const W = FIT[fit] || FIT.straight;
-    const sh = W[0] + pf, wa = W[1] + pf, hi = W[2] + pf;
+    // picture tiles exaggerate silhouette and volume so small differences stay visible
+    const W = (pic ? FIT_PIC : FIT)[fit] || FIT.straight;
+    const pv = pic ? pf * 2.5 : pf;
+    const sh = W[0] + pv, wa = W[1] + pv, hi = W[2] + pv;
     const hem = bottom > 224 ? hi + (bottom - 224) * W[3] : wa + (hi - wa) * (bottom - 196) / 28 - (t === "bomber" ? 2 : 0);
 
     let body;
@@ -438,7 +473,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       half.push([CX - hem, bottom, true]);
       body = smooth([...half, [CX, bottom + 3], ...mirror(half).reverse(), [CX, 131]]);
     }
-    const sw = (fit === "over" ? 20 : 16) + pf;
+    const sw = (fit === "over" ? (pic ? 24 : 20) : 16) + pv;
     const SL = [CX - sh + 6, 134], EL = [CX - sh - 6, 228];
     const SR = [200 - SL[0], SL[1]], ER = [200 - EL[0], EL[1]];
     const sleeveL = capsule(SL, EL, sw), sleeveR = capsule(SR, ER, sw);
@@ -503,6 +538,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     if (mats.includes("suede")) ov.push(`<ellipse cx="84" cy="176" rx="22" ry="34" fill="url(#${id("su")})"/><ellipse cx="118" cy="226" rx="18" ry="28" fill="url(#${id("su")})"/><ellipse cx="62" cy="190" rx="8" ry="22" fill="url(#${id("su")})"/>`);
     const sheen = finish === "gloss" || mats.includes("eco") ? 1 : mats.includes("leather") ? .6 : (isPuffer || mats.includes("nylon")) ? .45 : 0;
     if (sheen) ov.push(`<rect width="200" height="400" fill="url(#${id("gl")})" opacity="${sheen}"/>`);
+    if (pic && finish === "gloss") ov.push(`<rect width="200" height="400" fill="url(#${id("gl")})" transform="translate(52 0)" opacity=".7"/><ellipse cx="78" cy="150" rx="4" ry="9" fill="#fff" opacity=".6"/><ellipse cx="126" cy="200" rx="3" ry="7" fill="#fff" opacity=".45"/>`);
     if (!isCape && (mats.includes("leather") || mats.includes("eco") || mats.includes("suede"))) ov.push(`<path d="M${CX - 16},132 Q${CX - 14},180 ${CX - 16},${bottom} M${CX + 16},132 Q${CX + 14},180 ${CX + 16},${bottom}" stroke="${edge}" stroke-width=".9" fill="none"/>`);
     if (mats.includes("cotton")) ov.push(`<path d="M0,${bottom - 5} Q100,${bottom - 1} 200,${bottom - 5}" stroke="${detailC}" stroke-width=".7" stroke-dasharray="2 1.5" fill="none" opacity=".7"/>`);
     if (mats.includes("denim") || t === "denim") ov.push(`<path d="M${CX - sh},150 Q${CX},158 ${CX + sh},150" fill="none" stroke="#E8BE6E" stroke-width=".9" stroke-dasharray="2 1.6"/>`);
@@ -613,16 +649,32 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
   // Crops of the live drawing used as option pictures: field -> viewBox (or per-option map)
   const FULL = "20 46 160 320", SCENE = "0 6 200 380";
   const PICS = {
-    length: FULL, fit: FULL, insul: "34 96 132 176", temp: SCENE, hood: "50 46 100 100", fur: "50 46 100 100",
-    collar: "58 96 84 84", closure: "44 108 112 150", protect: SCENE, material: "56 138 88 88",
+    length: FULL, fit: "30 110 140 150", insul: "30 104 140 150", temp: "icon", hood: "50 46 100 100", fur: "50 46 100 100",
+    collar: "58 96 84 84", closure: "44 108 112 150", protect: "icon", material: "56 138 88 88",
     texture: "42 118 116 116", finish: "42 118 116 116", use: "36 120 148 252",
     details: { cuffs: "28 196 66 66", pockets: "44 128 112 150", waistAdj: "50 160 100 70", twoZip: "60 196 80 80", long: "40 196 120 150", inner: "" },
   };
-  const SCENE_FIELDS = new Set(["temp", "protect", "use"]);
-  const INNER_ICON = `<svg viewBox="0 0 60 60" aria-hidden="true"><path d="M14,8 L30,14 L30,56 L10,56 Z" fill="#E9B9C7"/><path d="M46,8 L30,14 L30,56 L50,56 Z" fill="#F5D3DD"/><rect x="34" y="26" width="12" height="14" rx="2" fill="none" stroke="#B0476B" stroke-width="1.5" stroke-dasharray="3 2"/></svg>`;
+  const SCENE_FIELDS = new Set(["use"]);
+  // Big clear symbols for warmth and weather (scene details are too small inside a tile)
+  const flake = (x, y, r) => [0, 60, 120].map(a => { const c = Math.cos(a * Math.PI / 180) * r, s2 = Math.sin(a * Math.PI / 180) * r; return `M${x - c},${y - s2} L${x + c},${y + s2}`; }).join(" ")
+    + [0, 60, 120, 180, 240, 300].map(a => { const t = a * Math.PI / 180, bx = x + Math.cos(t) * r * .62, by = y + Math.sin(t) * r * .62, k = r * .28;
+      return ` M${bx + Math.cos(t + 2.4) * k},${by + Math.sin(t + 2.4) * k} L${bx},${by} L${bx + Math.cos(t - 2.4) * k},${by + Math.sin(t - 2.4) * k}`; }).join("");
+  const SNOW = d => `<path d="${d}" stroke="#5A93D6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+  const CLOUD = (fill, dy = 0) => `<g transform="translate(0 ${dy})" fill="${fill}"><circle cx="36" cy="46" r="14"/><circle cx="54" cy="38" r="18"/><circle cx="70" cy="48" r="12"/><rect x="24" y="46" width="56" height="14" rx="7"/></g>`;
+  const DROP = (x, y, s = 1) => `<path d="M${x},${y - 9 * s} q${7 * s},${10 * s} 0,${16 * s} q${-7 * s},${-6 * s} 0,${-16 * s} Z" fill="#4F8FD6"/>`;
+  const ICONS = {
+    "temp:p5": `<path d="M50,16 C80,28 84,62 50,86 C16,62 20,28 50,16 Z" fill="#F08A3A"/><path d="M50,22 L50,84 M50,44 L64,34 M50,58 L36,48 M50,70 L62,62" stroke="#B9581C" stroke-width="2.5" stroke-linecap="round" fill="none"/>`,
+    "temp:0": CLOUD("#A9BCD9") + DROP(38, 74) + DROP(55, 80) + DROP(71, 72),
+    "temp:m10": SNOW(flake(50, 50, 30)),
+    "temp:m20": SNOW(flake(30, 34, 17) + " " + flake(70, 36, 17) + " " + flake(50, 70, 19)),
+    "protect:water": `<path d="M16,54 Q50,8 84,54 Q75,47 67,54 Q58,47 50,54 Q42,47 33,54 Q25,47 16,54 Z" fill="#EE3D6B"/><path d="M50,54 L50,80 q0,8 -8,8 q-6,0 -6,-6" stroke="#6B3A4A" stroke-width="3" fill="none" stroke-linecap="round"/>` + DROP(24, 22, .7) + DROP(76, 18, .7) + DROP(50, 14, .6),
+    "protect:wind": `<path d="M14,38 H58 a10,10 0 1 0 -10,-10 M14,54 H76 a11,11 0 1 1 -11,11 M14,70 H46" stroke="#5A82C8" stroke-width="6" fill="none" stroke-linecap="round"/>`,
+    "protect:any": `<circle cx="64" cy="38" r="16" fill="#F4B53F"/>` + CLOUD("#C6D2E6", 12),
+  };
+  const INNER_ICON = `<svg class="icon" viewBox="0 0 60 60" aria-hidden="true"><path d="M14,8 L30,14 L30,56 L10,56 Z" fill="#E9B9C7"/><path d="M46,8 L30,14 L30,56 L50,56 Z" fill="#F5D3DD"/><rect x="34" y="26" width="12" height="14" rx="2" fill="none" stroke="#B0476B" stroke-width="1.5" stroke-dasharray="3 2"/></svg>`;
   const tileGroup = g => `<div class="tiles" data-group="${g.id}">` + g.options.map(o => {
     const vb = typeof PICS[g.id] === "string" ? PICS[g.id] : PICS[g.id][o[0]];
-    const pic = vb ? `<svg viewBox="${vb}" aria-hidden="true"></svg>` : INNER_ICON;
+    const pic = vb === "icon" ? `<svg class="icon" viewBox="0 0 100 100" aria-hidden="true">${ICONS[g.id + ":" + o[0]]}</svg>` : vb ? `<svg viewBox="${vb}" aria-hidden="true"></svg>` : INNER_ICON;
     return `<button type="button" class="tile" id="opt-${g.id}-${o[0]}" data-v="${o[0]}" aria-pressed="false"><span class="pic">${pic}</span>${esc(o[1])}</button>`;
   }).join("") + "</div>";
   const chipGroup = g => PICS[g.id] ? tileGroup(g) : `<div class="chips" data-group="${g.id}">` + g.options.map(o =>
@@ -642,15 +694,14 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     return `<fieldset id="sec-${s.id}"><legend>${esc(s.title)}</legend>${s.hint ? `<p class="hint">${esc(s.hint)}</p>` : ""}${inner}</fieldset>`;
   }).join("");
 
-  // Mini illustrations on the type cards, in her first chosen colour when she has one
-  let thumbColor = null;
+  // Mini illustrations on the type cards, each in its own typical colour so the cards stay readable
+  let thumbsDrawn = false;
   function drawThumbs() {
-    const key = S.colors[0] || "";
-    if (key === thumbColor) return;
-    thumbColor = key;
+    if (thumbsDrawn) return;
+    thumbsDrawn = true;
     SECTIONS[0].options.forEach(([v]) => {
       const pr = PRESETS[v];
-      const st = Object.assign({}, pr, { type: v, colors: key ? [key] : [] });
+      const st = Object.assign({}, pr, { type: v, colors: [] });
       document.querySelector(`#opt-type-${v} svg`).innerHTML = illustrate(st, "t" + v, false);
     });
   }
@@ -670,11 +721,11 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     form.querySelectorAll(".tiles").forEach(g => {
       const field = g.dataset.group;
       g.querySelectorAll(".tile").forEach(b => {
-        const svg = b.querySelector("svg[viewBox]:not([viewBox='0 0 60 60'])"); if (!svg) return;
+        const svg = b.querySelector("svg:not(.icon)"); if (!svg) return;
         const st = previewState(field, b.dataset.v), key = JSON.stringify(st);
         if (picCache.get(b.id) === key) return;
         picCache.set(b.id, key);
-        svg.innerHTML = illustrate(st, "p" + field + b.dataset.v, SCENE_FIELDS.has(field));
+        svg.innerHTML = illustrate(st, "p" + field + b.dataset.v, SCENE_FIELDS.has(field), true);
       });
     });
   }
@@ -710,7 +761,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     if (tr) Object.keys(tr).forEach(f => tr[f].forEach(v => add(f, v, `Не бывает у типа «${lbl("type", st.type)}».`)));
     if (st.insul.includes("none")) ["m10", "m20"].forEach(v => add("temp", v, "Без утеплителя в мороз не будет тепло. Сначала убери «Без утеплителя»."));
     if (st.temp === "m10" || st.temp === "m20") add("insul", "none", `Для «${lbl("temp", st.temp)}» нужен утеплитель. Сначала поменяй температуру.`);
-    if (st.texture === "check") NO_CHECK.forEach(v => add("material", v, "Клетки не бывает на коже и мехе. Сначала убери узор «Клетка»."));
+    if (st.texture === "check") NO_CHECK.forEach(v => add("material", v, "Клетки не бывает на коже и мехе. Сначала убери узор «В клетку»."));
     if (st.material.some(v => NO_CHECK.includes(v))) add("texture", "check", "Клетки не бывает на коже и мехе. Сначала убери этот материал.");
     if (st.finish === "gloss") NO_GLOSS.forEach(v => add("material", v, "Этот материал не бывает блестящим. Сначала выбери «Матовая»."));
     if (st.material.some(v => NO_GLOSS.includes(v))) add("finish", "gloss", "Шерсть, замша, хлопок, деним и мех не бывают блестящими.");
@@ -748,6 +799,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     const picked = Array.isArray(S[field]) ? S[field].includes(v) : S[field] === v;
     const why = blockedMap(S).get(field + ":" + v);
     if (why && !picked) { showToast(why); return; }
+    if (picked && isAuto(field)) { S.touched.push(field); update(); return; }
     if (MULTI.has(field)) {
       const arr = S[field];
       if (picked) arr.splice(arr.indexOf(v), 1);
@@ -781,6 +833,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       g.querySelectorAll("button[data-v]").forEach(b => {
         const on = Array.isArray(val) ? val.includes(b.dataset.v) : val === b.dataset.v;
         b.setAttribute("aria-pressed", on ? "true" : "false");
+        if (on && isAuto(g.dataset.group)) b.dataset.auto = "1"; else delete b.dataset.auto;
         const why = !on && blocked.get(g.dataset.group + ":" + b.dataset.v);
         if (why) { b.setAttribute("aria-disabled", "true"); b.title = why; } else { b.removeAttribute("aria-disabled"); b.removeAttribute("title"); }
       });
@@ -790,29 +843,34 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
 
   // ---------- Summary ----------
   const lbl = (f, v) => (LABEL[f] && LABEL[f][v]) || v;
+  const lc = t => t.replace(/^./, c => c.toLowerCase());
   const list = (f, arr) => arr.map(v => lbl(f, v).replace(/^./, c => c.toLowerCase())).join(", ");
+  const isAuto = f => PRESET_KEYS.includes(f) && !S.touched.includes(f);
   function summaryLines() {
-    const lines = [], add = (n, v) => { if (v) lines.push(`• ${n}: ${v}`); };
+    const lines = [], autos = [];
+    const add = (n, v, f) => { if (!v) return; if (f && isAuto(f)) autos.push(`${n.replace(/^./, c => c.toLowerCase())} ${v}`); else lines.push(`• ${n}: ${v}`); };
+    const one = f => S[f] && lc(lbl(f, S[f]));
     add("Тип", S.type && lbl("type", S.type));
-    add("Длина", S.length && lbl("length", S.length).replace(/^./, c => c.toLowerCase()));
-    add("Силуэт", S.fit && lbl("fit", S.fit).replace(/^./, c => c.toLowerCase()));
-    add("Утеплитель", list("insul", S.insul));
-    add("Тепло", S.temp && lbl("temp", S.temp).replace(/^./, c => c.toLowerCase()));
-    add("Капюшон", S.hood && lbl("hood", S.hood).replace(/^./, c => c.toLowerCase()));
-    add("Мех", S.fur && (S.fur === "no" ? "без меха" : lbl("fur", S.fur).replace(/^./, c => c.toLowerCase())));
-    add("Воротник", S.collar && lbl("collar", S.collar).replace(/^./, c => c.toLowerCase()));
-    add("Застёжка", S.closure && lbl("closure", S.closure).replace(/^./, c => c.toLowerCase()));
+    add("Длина", one("length"), "length");
+    add("Силуэт", one("fit"), "fit");
+    add("Утеплитель", S.insul.includes("none") ? "нет" : list("insul", S.insul), "insul");
+    add("Тёплая", one("temp"));
+    add("Капюшон", S.hood && (S.hood === "no" ? "нет" : one("hood")), "hood");
+    add("Мех", S.fur && (S.fur === "no" ? "нет" : one("fur")), "fur");
+    add("Воротник", S.collar && (S.collar === "none" ? "нет" : one("collar")), "collar");
+    add("Застёжка", one("closure"), "closure");
     add("Защита", list("protect", S.protect));
-    add("Материал", list("material", S.material));
+    add("Материал", list("material", S.material), "material");
     add("Цвета", list("colors", S.colors));
-    add("Узор", S.texture && lbl("texture", S.texture).replace(/^./, c => c.toLowerCase()));
-    add("Поверхность", S.finish && lbl("finish", S.finish).replace(/^./, c => c.toLowerCase()));
+    add("Узор", one("texture"), "texture");
+    add("Поверхность", one("finish"), "finish");
     add("Детали", list("details", S.details));
     add("Для чего", list("use", S.use));
     add("Размер", S.size.join(" или "));
     add("Обязательно", S.must.trim());
     add("Точно не хочу", S.nogo.trim());
     add("Бренды и ссылки", S.brands.trim());
+    if (autos.length) lines.push(`• По умолчанию для этого типа (не меняла): ${autos.join("; ")}`);
     return lines;
   }
   const canLink = () => /^https?:$/.test(location.protocol) && window.self === window.top;
@@ -832,12 +890,18 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       S.hood && S.hood !== "no" && "Капюшон", (S.fur === "faux" || S.fur === "real") && "С мехом", S.size.length && "Размер " + S.size.join("/")].filter(Boolean);
     document.getElementById("tags").innerHTML = tags.map(x => `<li>${esc(x)}</li>`).join("");
     document.getElementById("dots").innerHTML = S.colors.map(c => `<span style="background:${COLOR_HEX[c]}" title="${esc(lbl("colors", c))}"></span>`).join("");
-    const done = COUNTED.filter(k => Array.isArray(S[k]) ? S[k].length : S[k]).length;
+    const done = COUNTED.filter(k => (Array.isArray(S[k]) ? S[k].length : S[k]) && !isAuto(k)).length;
     document.getElementById("meterText").textContent = `Отвечено ${done} из ${COUNTED.length}`;
     document.getElementById("meterBar").style.width = (100 * done / COUNTED.length) + "%";
   }
+  function updateMini() {
+    if (document.getElementById("mini").hidden) return;
+    document.getElementById("miniArt").innerHTML = illustrate(S, "mini", false);
+    document.getElementById("miniKind").textContent = document.getElementById("kind").textContent;
+    document.getElementById("miniMeter").textContent = document.getElementById("meterText").textContent;
+  }
   function update(textOnly) {
-    if (!textOnly) { syncForm(); updateStage(); drawThumbs(); drawOptionPics(); }
+    if (!textOnly) { syncForm(); updateStage(); drawThumbs(); drawOptionPics(); updateMini(); }
     document.getElementById("summary").textContent = summaryText(false);
     save();
   }
@@ -868,6 +932,19 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       setTimeout(() => { delete resetBtn.dataset.armed; resetBtn.textContent = "Начать заново"; }, 3500);
     }
   });
+
+  // Phones: the big drawing scrolls away with the header and a slim bar takes over
+  const stageEl = document.querySelector(".stage"), mini = document.getElementById("mini");
+  const phone = window.matchMedia("(max-width: 879px)");
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(([en]) => {
+      const show = phone.matches && !en.isIntersecting && en.boundingClientRect.top < 0;
+      if (mini.hidden === !show) return;
+      mini.hidden = !show; updateMini();
+    }).observe(stageEl);
+  }
+  document.querySelectorAll("[data-done]").forEach(b => b.addEventListener("click", () =>
+    document.querySelector(".result").scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" })));
 
   sanitize();
   update();

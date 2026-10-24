@@ -280,7 +280,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     ], sub2: { id: "finish", title: "Поверхность", options: [
       ["matte", "Матовая"], ["gloss", "Блестящая"],
     ]}}},
-    { id: "details", title: "Детали", hint: "Можно несколько.", kind: "multi", options: [
+    { id: "details", title: "Детали", hint: "Можно несколько. Внутренние карманы на рисунке не видны.", kind: "multi", options: [
       ["cuffs", "Трикотажные манжеты"], ["pockets", "Много карманов"], ["inner", "Внутренние карманы"], ["waistAdj", "Регулируемая талия"], ["twoZip", "Двусторонняя молния"], ["long", "Удлинённая спинка"],
     ]},
     { id: "use", title: "Для чего", hint: "Можно несколько.", kind: "multi", options: [
@@ -389,8 +389,15 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     const collar = st.collar || "", closure = st.closure || "";
     const texture = st.texture || "", finish = st.finish || "";
     const id = s => `${s}-${uid}`;
+    const scene = !uid.startsWith("t");
+    const use = st.use || [], protect = st.protect || [];
+    const H = str => `<g transform="translate(100 56) scale(1.2) translate(-100 -56)">${str}</g>`;
 
-    const W = FIT[fit] || FIT.straight, pf = isPuffer ? 4 : 0;
+    const insul = st.insul || [];
+    const temp = st.temp || "";
+    const pf = Math.max(insul.includes("down") ? 3 : 0, insul.includes("synth") ? 2 : 0, insul.includes("furIns") ? 2 : 0, insul.includes("wool") ? 1 : 0)
+      + (isPuffer ? 2 : 0) + (temp === "m20" ? 1 : 0);
+    const W = FIT[fit] || FIT.straight;
     const sh = W[0] + pf, ch = W[1] + pf, wa = W[2] + pf, hi = W[3] + pf;
     const hem = bottom > 186 ? hi + (bottom - 180) * W[4] : wa + (hi - wa) * (bottom - 140) / 38 - (t === "bomber" ? 2 : 0);
 
@@ -422,17 +429,36 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       <filter id="${id("n")}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="${mats.includes("furM") || t === "fur" ? .45 : 1.2}" numOctaves="2" seed="7"/><feColorMatrix type="saturate" values="0"/></filter>
     </defs>`);
 
+    if (scene) {
+      const P = [[18,40],[170,30],[34,120],[160,110],[12,210],[178,190],[40,300],[165,280],[26,350],[150,60],[60,20],[140,160],[186,250],[10,280],[176,345],[48,170]];
+      if (temp === "p5") P.slice(0, 9).forEach(([x, y], i) => o.push(`<ellipse cx="${x}" cy="${y}" rx="5" ry="2.6" transform="rotate(${i * 47 % 180} ${x} ${y})" fill="${["#F08A3A", "#E2552E", "#F4B53F"][i % 3]}" opacity=".85"/>`));
+      if (temp === "0" || protect.includes("water")) P.forEach(([x, y]) => o.push(`<line x1="${x}" y1="${y}" x2="${x - 3}" y2="${y + 10}" stroke="#6FA3DB" stroke-width="1.4" stroke-linecap="round" opacity=".55"/>`));
+      if (temp === "m10" || temp === "m20") {
+        const flakes = temp === "m20" ? P.concat(P.map(([x, y]) => [(x + 37) % 196, (y + 63) % 360])) : P;
+        flakes.forEach(([x, y], i) => o.push(`<circle cx="${x}" cy="${y}" r="${1.4 + (i % 3) * .7}" fill="#fff" stroke="#B9C9E4" stroke-width=".5"/>`));
+        if (temp === "m20") o.push(`<path d="M0,378 Q50,362 100,370 Q150,360 200,374 L200,400 L0,400 Z" fill="#fff" stroke="#D5E0F0"/>`);
+      }
+      if (protect.includes("wind")) o.push(`<path d="M8,96 q20,-8 34,0 q8,5 0,9 M156,140 q18,-8 32,0 M150,150 q14,-6 26,0 M10,250 q22,-8 36,0 q8,6 -1,9" stroke="#8DA9D6" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8"/>`);
+      if (use.includes("trip")) o.push(`<rect x="146" y="298" width="34" height="66" rx="6" fill="#4F7FD1" stroke="#36599A"/><path d="M155,298 L155,280 L171,280 L171,298" fill="none" stroke="#36599A" stroke-width="2.4"/><line x1="146" x2="180" y1="318" y2="318" stroke="#36599A"/><line x1="146" x2="180" y1="344" y2="344" stroke="#36599A"/><circle cx="152" cy="367" r="3" fill="#2B2B33"/><circle cx="174" cy="367" r="3" fill="#2B2B33"/>`);
+    }
     // ground shadow
     o.push(`<ellipse cx="100" cy="374" rx="44" ry="6" fill="#000" opacity=".12"/>`);
     // hair, back layer
-    if (!hood) o.push(`<path d="${smooth([[100, 17], [115, 21], [122, 36], [121, 60], [126, 90], [121, 116], [110, 120], [106, 92], [94, 92], [90, 120], [79, 116], [74, 90], [79, 60], [78, 36], [85, 21]])}" fill="url(#${id("hr")})"/>`);
+    if (!hood) o.push(H(`<path d="${smooth([[100, 17], [115, 21], [122, 36], [121, 54], [124, 68], [119, 78], [110, 75], [106, 64], [94, 64], [90, 75], [81, 78], [76, 68], [79, 54], [78, 36], [85, 21]])}" fill="url(#${id("hr")})"/>`));
+    if ((st.details || []).includes("long") && !isCape) o.push(`<path d="M${CX - hem + 3},${bottom - 4} Q${CX},${bottom + 22} ${CX + hem - 3},${bottom - 4} Z" fill="${shade(color, -.28)}"/>`);
     // legs (slim jeans) and ankle boots
     const legL = [[CX - 27, 160], [CX - 26, 210], [CX - 18, 262], [CX - 17, 305], [CX - 13, 345], [CX - 5, 345], [CX - 4, 300], [CX - 3, 262], [CX - 1, 200]];
+    o.push(`<path d="M${CX - 26},136 L${CX + 26},136 Q${CX + 29},160 ${CX + 27},176 L${CX - 27},176 Q${CX - 29},160 ${CX - 26},136 Z" fill="${LEGS}"/>`);
     o.push(`<path d="${smooth(legL)}" fill="${LEGS}"/><path d="${smooth(mirror(legL))}" fill="${LEGS}"/>`);
     o.push(`<path d="M${CX - 1},190 L${CX - 1},250" stroke="#000" stroke-opacity=".2" stroke-width="1"/>`);
-    const boot = [[CX - 15, 334], [CX - 4, 334], [CX - 3, 362], [CX - 3, 371, true], [CX - 22, 371, true], [CX - 21, 365], [CX - 14, 359]];
-    o.push(`<path d="${smooth(boot)}" fill="${BOOT}"/><path d="${smooth(mirror(boot))}" fill="${BOOT}"/>`);
-    o.push(`<rect x="${CX - 7}" y="366" width="4" height="7" rx="1" fill="${BOOT}"/><rect x="${CX + 3}" y="366" width="4" height="7" rx="1" fill="${BOOT}"/>`);
+    if (use.includes("active")) {
+      const sn = [[CX - 15, 356], [CX - 4, 355], [CX - 3, 371, true], [CX - 23, 371, true], [CX - 22, 364]];
+      o.push(`<path d="${smooth(sn)}" fill="#F7F7FA" stroke="#B7BCCB" stroke-width=".8"/><path d="${smooth(mirror(sn))}" fill="#F7F7FA" stroke="#B7BCCB" stroke-width=".8"/><path d="M${CX - 23},369 L${CX - 3},369 M${CX + 3},369 L${CX + 23},369" stroke="#EE3D6B" stroke-width="2"/>`);
+    } else {
+      const boot = [[CX - 15, 334], [CX - 4, 334], [CX - 3, 362], [CX - 3, 371, true], [CX - 22, 371, true], [CX - 21, 365], [CX - 14, 359]];
+      o.push(`<path d="${smooth(boot)}" fill="${BOOT}"/><path d="${smooth(mirror(boot))}" fill="${BOOT}"/>`);
+      o.push(`<rect x="${CX - 7}" y="366" width="4" height="7" rx="1" fill="${BOOT}"/><rect x="${CX + 3}" y="366" width="4" height="7" rx="1" fill="${BOOT}"/>`);
+    }
     // neck and hands
     o.push(`<path d="M94,46 L106,46 L107,62 Q100,66 93,62 Z" fill="${SKIN}"/><path d="M94,52 Q100,57 106,52 L106,56 Q100,60 94,56 Z" fill="${SKIN_SH}" opacity=".5"/>`);
     if (!isCape) o.push(`<ellipse cx="${handX}" cy="203" rx="4.3" ry="7" fill="${SKIN}"/><ellipse cx="${200 - handX}" cy="203" rx="4.3" ry="7" fill="${SKIN}"/>`);
@@ -451,9 +477,12 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
       for (let x = 9; x < 200; x += 13) ov.push(`<line x1="${x}" x2="${x}" y1="0" y2="400" stroke="${shade(color, -.6)}" stroke-width=".6" opacity=".55"/>`);
     }
     const furry = mats.includes("furM") || t === "fur";
-    if (furry || mats.includes("wool") || mats.includes("suede") || mats.includes("denim")) ov.push(`<rect width="200" height="400" filter="url(#${id("n")})" opacity="${furry ? .3 : .12}" style="mix-blend-mode:overlay"/>`);
+    if (furry || mats.includes("wool") || mats.includes("suede") || mats.includes("denim")) ov.push(`<rect width="200" height="400" filter="url(#${id("n")})" opacity="${furry ? .3 : mats.includes("suede") ? .2 : .14}" style="mix-blend-mode:overlay"/>`);
     ov.push(`<rect width="200" height="400" fill="url(#${id("sh")})"/>`);
-    if (finish === "gloss" || mats.includes("leather") || mats.includes("eco") || isPuffer) ov.push(`<rect width="200" height="400" fill="url(#${id("gl")})" opacity="${finish === "gloss" ? 1 : .55}"/>`);
+    const sheen = finish === "gloss" ? 1 : (mats.includes("leather") || mats.includes("eco")) ? .7 : (isPuffer || mats.includes("nylon")) ? .4 : 0;
+    if (sheen) ov.push(`<rect width="200" height="400" fill="url(#${id("gl")})" opacity="${sheen}"/>`);
+    if (!isCape && (mats.includes("leather") || mats.includes("eco") || mats.includes("suede"))) ov.push(`<path d="M${CX - 15},${66} Q${CX - 13},110 ${CX - 15},${bottom} M${CX + 15},66 Q${CX + 13},110 ${CX + 15},${bottom}" stroke="${edge}" stroke-width=".9" fill="none"/>`);
+    if (mats.includes("cotton")) ov.push(`<path d="M0,${bottom - 5} Q100,${bottom - 1} 200,${bottom - 5}" stroke="${detailC}" stroke-width=".7" stroke-dasharray="2 1.5" fill="none" opacity=".7"/>`);
     if (!isCape) [1, -1].forEach(s => {   // elbow folds and armhole seam
       const m = x => s > 0 ? x : 200 - x;
       ov.push(`<path d="M${m(CX - sh - 6)},128 q4,3 9,1 M${m(CX - sh - 6)},136 q4,2 8,0" stroke="${edge}" stroke-width=".8" fill="none" opacity=".8"/><path d="M${m(CX - sh + 4)},63 Q${m(CX - sh + 6)},84 ${m(CX - ch + 4)},100" stroke="${edge}" stroke-width=".8" fill="none" opacity=".7"/>`);
@@ -512,6 +541,19 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     } else if (closure === "wrap") {
       o.push(`<path d="M${CX - 6},64 Q${CX + 6},120 ${CX + hem - 6},${endY}" fill="none" stroke="${edge}" stroke-width="1.2"/>`);
     }
+    if (insul.includes("furIns") && !furry) {
+      const sh2 = "#F1E4CC";
+      o.push(`<path d="M${CX - hem + 1},${bottom - 1} Q${CX},${bottom + 3} ${CX + hem - 1},${bottom - 1}" stroke="${sh2}" stroke-width="4" stroke-dasharray="1.4 1" stroke-linecap="round" fill="none"/>`);
+      if (!isCape) [1, -1].forEach(s => { const m = x => s > 0 ? x : 200 - x;
+        o.push(`<line x1="${m(wristX - sw / 2 + 1)}" y1="193" x2="${m(wristX + sw / 2 - 1)}" y2="195" stroke="${sh2}" stroke-width="4" stroke-dasharray="1.4 1" stroke-linecap="round"/>`); });
+    }
+    if (protect.includes("water")) [[CX - 18, 110], [CX + 16, 128], [CX - 10, 168], [CX + 22, 186], [CX - 30, 150], [CX + 8, 90]].forEach(([x, y]) => {
+      if (y < bottom - 6) o.push(`<path d="M${x},${y} q-2.2,3.4 0,4.8 q2.2,-1.4 0,-4.8 Z" fill="#fff" opacity=".75"/>`);
+    });
+    if (scene && use.includes("active") && !isCape) o.push(`<path d="M${CX - 17},60 Q${CX - 20},100 ${CX - 22},132 M${CX + 17},60 Q${CX + 20},100 ${CX + 22},132" stroke="#3A3F55" stroke-width="3.2" fill="none" stroke-linecap="round"/>`);
+    if (scene && use.includes("city") && !isCape) { const bx = 200 - handX;
+      o.push(`<path d="M${bx - 5},204 Q${bx},190 ${bx + 5},204" stroke="#8E3E2A" stroke-width="1.6" fill="none"/><rect x="${bx - 9}" y="203" width="20" height="15" rx="4" fill="#C0623F" stroke="#8E3E2A"/><rect x="${bx - 1}" y="207" width="4" height="3" rx="1" fill="#E8C77A"/>`); }
+    if (scene && use.includes("walk") && !isCape) o.push(`<path d="M${handX - 4},195 L${handX + 4},195 L${handX + 3},208 L${handX - 3},208 Z" fill="#FFFFFF" stroke="#B9A08A" stroke-width=".7"/><rect x="${handX - 3.7}" y="199" width="7.4" height="4" fill="#9A6A48"/><rect x="${handX - 4.6}" y="193" width="9.2" height="2.4" rx="1" fill="#E9E2DA"/>`);
     // collar
     const lap = shade(color, light ? -.07 : .1);
     const furCollar = hasFur && !hood;
@@ -528,28 +570,31 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     }
     if (furCollar && collar && collar !== "none") o.push(`<path d="M${CX - 21},66 Q${CX},44 ${CX + 21},66" fill="none" stroke="${furC}" stroke-width="7" stroke-dasharray="1.6 1.2" stroke-linecap="round"/>`);
 
-    // hood (back part) and its inner shadow
+    const head = [];
+    { const o = head;
     if (hood) {
       o.push(`<path d="${smooth([[100, 12], [117, 17], [124, 36], [123, 55], [118, 66], [100, 70], [82, 66], [77, 55], [76, 36], [83, 17]])}" fill="${color}" stroke="${edge}" stroke-width="1"/>`);
       if (texture === "quilt") o.push(`<path d="M78,30 Q100,24 122,30 M77,46 Q100,41 123,46" fill="none" stroke="${edge}" stroke-width="1"/>`);
-      o.push(`<ellipse cx="100" cy="39" rx="15" ry="18" fill="${shade(color, -.45)}"/>`);
+      o.push(`<ellipse cx="100" cy="39" rx="15" ry="18" fill="${shade(color, -.2)}"/>`);
       if (st.hood === "detach") o.push(`<path d="M84,64 Q100,71 116,64" fill="none" stroke="${detailC}" stroke-width="1" stroke-dasharray="2 1.5"/>`);
     }
     // face
     o.push(`<path d="${smooth([[88.5, 35], [89.5, 46], [100, 53.5], [110.5, 46], [111.5, 35], [108, 25], [100, 22.5], [92, 25]])}" fill="${SKIN}"/>`);
     o.push(`<ellipse cx="93" cy="45" rx="3" ry="1.8" fill="#F29A9A" opacity=".35"/><ellipse cx="107" cy="45" rx="3" ry="1.8" fill="#F29A9A" opacity=".35"/>`);
     o.push(`<path d="M91.8,33.6 q3,-1.8 6,-.2 M102.2,33.4 q3,-1.6 6,.2" stroke="#B88A45" stroke-width=".9" fill="none" stroke-linecap="round"/>`);
-    o.push(`<ellipse cx="95" cy="39" rx="1.5" ry="1.9" fill="#3B2A3F"/><ellipse cx="105" cy="39" rx="1.5" ry="1.9" fill="#3B2A3F"/><circle cx="95.5" cy="38.4" r=".5" fill="#fff"/><circle cx="105.5" cy="38.4" r=".5" fill="#fff"/>`);
-    o.push(`<path d="M92.6,37.6 q2.4,-1.6 4.8,0 M102.6,37.6 q2.4,-1.6 4.8,0" stroke="#3B2A3F" stroke-width=".8" fill="none" stroke-linecap="round"/>`);
+    o.push(`<ellipse cx="95" cy="39.4" rx="1.8" ry="2.1" fill="#4A6FA5"/><ellipse cx="105" cy="39.4" rx="1.8" ry="2.1" fill="#4A6FA5"/><circle cx="95" cy="39.6" r="1" fill="#2A2233"/><circle cx="105" cy="39.6" r="1" fill="#2A2233"/><circle cx="95.6" cy="38.7" r=".55" fill="#fff"/><circle cx="105.6" cy="38.7" r=".55" fill="#fff"/>`);
+    o.push(`<path d="M92.8,38 q2.2,-2 4.6,-.4 l.8,-.6 M107.2,38 q-2.2,-2 -4.6,-.4 l-.8,-.6" stroke="#3B2A3F" stroke-width=".9" fill="none" stroke-linecap="round"/>`);
     o.push(`<path d="M100.2,41 q-1,2.6 -.4,3.6 q.8,.4 1.6,0" stroke="${SKIN_SH}" stroke-width=".8" fill="none" stroke-linecap="round"/>`);
-    o.push(`<path d="M97,48.2 q3,-1 6,0 q-3,2.6 -6,0 Z" fill="#E06F7E"/>`);
+    o.push(`<path d="M96.6,47.4 q3.4,3 6.8,0 q-3.4,1.2 -6.8,0 Z" fill="#E06F7E"/><path d="M96.2,47.2 q3.8,3.6 7.6,0" stroke="#C85566" stroke-width=".6" fill="none" stroke-linecap="round"/>`);
     // hair, front: side-parted fringe and two long locks over the shoulders
     o.push(`<path d="${smooth([[87.5, 38], [87, 27], [94, 19], [104, 18], [112, 23], [113, 36], [111, 30], [104, 26], [98, 27.5], [92, 29]])}" fill="url(#${id("hr")})"/>`);
-    const lockL = [[88.5, 28], [85.5, 44], [86, 64], [83, 84], [86, 98], [91, 86], [91.5, 64], [90.5, 44]];
+    const lockL = [[88.5, 28], [85.5, 44], [86, 58], [84, 70], [87.5, 76], [91, 68], [91.5, 56], [90.5, 44]];
     o.push(`<path d="${smooth(lockL)}" fill="url(#${id("hr")})"/><path d="${smooth(mirror(lockL))}" fill="url(#${id("hr")})"/>`);
-    o.push(`<path d="M95,21 Q100,24 106,22 M88,52 q-1,14 -2,28 M112,52 q1,14 2,28" stroke="${HAIR_HI}" stroke-width=".9" fill="none" stroke-linecap="round" opacity=".9"/>`);
+    o.push(`<path d="M95,21 Q100,24 106,22 M88,50 q-1,9 -2,18 M112,50 q1,9 2,18" stroke="${HAIR_HI}" stroke-width=".9" fill="none" stroke-linecap="round" opacity=".9"/>`);
     // fur trim around the hood opening
     if (hood && hasFur) o.push(`<ellipse cx="100" cy="40" rx="17.5" ry="20.5" fill="none" stroke="${furC}" stroke-width="7" stroke-dasharray="1.7 1.2" stroke-linecap="round"/>`);
+    }
+    o.push(H(head.join("")));
     return o.join("");
   }
 
@@ -660,7 +705,7 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid var(--sun); ou
     document.getElementById("art").innerHTML = illustrate(S, "main");
     document.getElementById("kind").textContent = S.type ? lbl("type", S.type) : "Выбери тип куртки";
     const tags = [S.length && lbl("length", S.length), S.fit && lbl("fit", S.fit), S.temp && lbl("temp", S.temp),
-      S.hood && S.hood !== "no" && "Капюшон", (S.fur === "faux" || S.fur === "real") && "С мехом"].filter(Boolean);
+      S.hood && S.hood !== "no" && "Капюшон", (S.fur === "faux" || S.fur === "real") && "С мехом", S.size.length && "Размер " + S.size.join("/")].filter(Boolean);
     document.getElementById("tags").innerHTML = tags.map(x => `<li>${esc(x)}</li>`).join("");
     document.getElementById("dots").innerHTML = S.colors.map(c => `<span style="background:${COLOR_HEX[c]}" title="${esc(lbl("colors", c))}"></span>`).join("");
     const done = COUNTED.filter(k => Array.isArray(S[k]) ? S[k].length : S[k]).length;
